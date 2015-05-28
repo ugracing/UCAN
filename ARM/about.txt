@@ -1,0 +1,10 @@
+UCAN for ARM platforms and toolchains.
+Supported toolchains:
+	-gcc
+	-MBED [WIP]
+
+Supported MCUs:
+	-LPC1768 [WIP]
+
+Boards tested:
+	-MBED/LPC1768 [WIP]

@@ -1,0 +1,11 @@
+UCAN for AVR platforms and toolchains.
+Supported toolchains:
+	-Arduino
+
+Supported MCUs:
+	-ATMega328
+	-ATMega168
+
+Boards tested:
+	-Arduino Duemilanove
+	-Arduino Pro mini (5V/16MHz)
