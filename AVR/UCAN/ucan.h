@@ -164,6 +164,7 @@
 			void Initialize(void);
 			void StoreMessage(int n, UCANMessage MSG);
 			UCANMessage FetchMessage(int n);
+			bool IsMessageEmpty(int n);
 	};
 
 	class UCAN_UCANHandler //Stub Started
@@ -172,6 +173,7 @@
 			MCP_CAN* MCPCANBus;
 			bool Initialized;
 			int CAN_ID;
+			void* MainCall;
 			
 			uint8_t UCANStackMode;
 			uint8_t UCANFeedMode;
@@ -187,6 +189,10 @@
 			UCANMessage CAN_FetchMsgFromCAN(void);
 			void CAN_SendMSG(UCANMessage MSG);
 			void ProcessMSGTriggers(void);
+			void MSGDispatcher(UCANMessage MSG);
+			void MSGProcessor_InfoServ(UCANMessage MSG);
+			void MSGProcessor_DataServ(UCANMessage MSG);
+			void Announce(uint8_t flag, int data);
 			
 		public:
 			void HandlerMode(int Mode);
@@ -203,7 +209,6 @@
 			
 			uint8_t NewStreamDUID(void);
 	};
-	
-	
+
 
 

@@ -796,9 +796,21 @@ INT32U MCP_CAN::getCanId(void)
   END FILE
 *********************************************************************************************************/
 
+bool UCAN_UCANMSGStack::IsMessageEmpty(int n)
+{
+	if (n >= 0 && n < UCAN_MSGStack_Size && InUse[n] == true)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	};
+};
+
 UCANMessage UCAN_UCANMSGStack::FetchMessage(int n)
 {
-	if (n >= 0 && n < UCAN_MSGStack_Size)
+	if (n >= 0 && n < UCAN_MSGStack_Size && InUse[n] == true)
 	{
 		return Data[n];
 	}
@@ -1041,6 +1053,24 @@ void UCAN_UCANHandler::SendMessage(UCANMessage msg)
 	CAN_SendMSG(msg);
 };
 
+void UCAN_UCANHandler::Announce(uint8_t flag, int data)
+{
+	union
+	{
+		int i16;
+		uint8_t b[2];
+	};
+	
+	UCANMessage MSG;
+	
+	i16 = data;
+	
+	MSG.Channel = 0;
+	MSG.Data[0] = flag;
+	MSG.Data[1] = b[0];
+	MSG.Data[2] = b[1];
+};
+
 void UCAN_UCANHandler::Initialize(void)
 {
 	MCPCANBus = &MCP_CAN(UCAN_MCPRXPin);
@@ -1055,6 +1085,9 @@ void UCAN_UCANHandler::Initialize(void)
 	{
 		DebugMSG(UCAN_Debug_BadCANInit);
 	};
+	
+	//Let other devices we are joining the bus
+	Announce(0, 0); //Send an announce on Flag 0, Data = 0
 	
 	//See implementation note above
 	//RequestCanID(2047);
@@ -1078,6 +1111,7 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 	if (UCANCallMode == UCAN_CallMode_FullAuto)
 	{
 		//Attach UCANHandler.main() to CAN interrupt
+		//attachInterrupt(0, this.Main, CHANGE);
 	};
 	
 	if (UCANCallMode == UCAN_CallMode_ContAuto)
@@ -1177,9 +1211,51 @@ void UCAN_UCANHandler::FetchNewMessages(void)
 	};
 };
 
+void UCAN_UCANHandler::MSGProcessor_DataServ(UCANMessage MSG)
+{
+	switch (MSG.Data[0])
+	{
+		case 0:
+			break;
+	};
+};
+
+void UCAN_UCANHandler::MSGProcessor_InfoServ(UCANMessage MSG)
+{
+	switch (MSG.Data[0])
+	{
+		case 0:
+			break;
+	};
+};
+
+void UCAN_UCANHandler::MSGDispatcher(UCANMessage MSG)
+{
+	switch (MSG.Channel)
+	{
+		case 0:
+				MSGProcessor_InfoServ(MSG);
+			break;
+			
+		case 1:
+				MSGProcessor_DataServ(MSG);
+			break;
+	};
+};
+
 void UCAN_UCANHandler::ProcessMSGTriggers(void)
 {
-	DebugMSG(UCAN_Debug_Stub);
+	int c = 0;
+	
+	while (c < UCAN_FeedStack_Size)
+	{
+		if (MSGStack.IsMessageEmpty(c) == false)
+		{
+			MSGDispatcher(MSGStack.FetchMessage(c));
+		};
+		
+		c ++;
+	};
 };
 
 void UCAN_UCANHandler::Main(void)
