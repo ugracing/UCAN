@@ -831,7 +831,7 @@ void UCAN_UCANFeedStack::TrackID(int id)
 	};
 };
 
-void UCAN_UCANFeedStack::UnTrackID(int id)
+void UCAN_UCANFeedStack::unTrackID(int id)
 {
 	int n = FindIDPosition(id);
 	
@@ -847,7 +847,7 @@ void UCAN_UCANFeedStack::SetIDTracking(int id, bool mode)
 {
 	if (mode == false)
 	{
-		UnTrackID(id);
+		unTrackID(id);
 	}
 	else if (mode == true)
 	{
@@ -1064,6 +1064,7 @@ void UCAN_UCANHandler::Initialize(void)
 
 void UCAN_UCANHandler::Empty(void)
 {
+	DebugMSG(UCAN_Debug_Stub);
 };
 
 
@@ -1111,8 +1112,9 @@ void UCAN_UCANHandler::StackMode(int Mode)
 	};
 };
 
-void UCAN_UCANHandler::WatchValue_f32(int ValueGUI, float *f32Pointer)
+void UCAN_UCANHandler::WatchValue_f32(int ValueID, float* f32Pointer)
 {
+	TrackingStack.TrackID(ValueID, f32Pointer);
 };
 
 bool UCAN_UCANHandler::IsMessagePending(void)
@@ -1175,9 +1177,15 @@ void UCAN_UCANHandler::FetchNewMessages(void)
 	};
 };
 
+void UCAN_UCANHandler::ProcessMSGTriggers(void)
+{
+	DebugMSG(UCAN_Debug_Stub);
+};
+
 void UCAN_UCANHandler::Main(void)
 {
 	FetchNewMessages();
+	ProcessMSGTriggers();
 	//ProcessUCANOperations(); //Not yet implemented
 };
 
@@ -1198,3 +1206,111 @@ UCANMessage UCAN_EmptyMessage(void)
 	return ReturnMSG;
 };
 
+void UCAN_UCANWatchStack::Empty(void)
+{
+	int c = 0;
+	while (c < UCAN_FeedStack_Size)
+	{
+		Target[c] = 0;
+		TrackingID[c] = 0;
+		
+		c ++;
+	};
+};
+
+void UCAN_UCANWatchStack::Initialize(void)
+{
+	Empty(); //Somewhat equivalent for now
+};
+
+int UCAN_UCANWatchStack::FindTargetPosition(float* LMem)
+{
+	int c = 0;
+	while (c < UCAN_FeedStack_Size)
+	{
+		if (LMem == Target[c])
+		{
+			return c;
+		};
+		
+		c ++;
+	};
+	
+	return 0;
+};
+
+int UCAN_UCANWatchStack::FindEntry(int id, float* TMem)
+{
+	int c = 0;
+	while (c < UCAN_FeedStack_Size)
+	{
+		if (id == TrackingID[c] && TMem == Target[c])
+		{
+			return c;
+		};
+		
+		c ++;
+	};
+	
+	return 0;
+};
+
+bool UCAN_UCANWatchStack::IsDuplicate(int id, float* TMem)
+{
+	int c = 0;
+	while (c < UCAN_FeedStack_Size)
+	{
+		if (id == TrackingID[c] && TMem == Target[c])
+		{
+			return true;
+		};
+		
+		c ++;
+	};
+	
+	return false;
+};
+
+int UCAN_UCANWatchStack::FindEmptyPosition()
+{
+	int c = 0;
+	while (c < UCAN_FeedStack_Size)
+	{
+		if (!Target[c])
+		{
+			return c;
+		};
+		c ++;
+	};
+	return 0; //Keeps things alive in case of bad code
+};
+
+void UCAN_UCANWatchStack::TrackID(int id, float* TMem)
+{
+	int t = 0;
+	
+	if (IsDuplicate(id, TMem) == true)
+	{
+		return;
+	};
+	
+	t = FindEmptyPosition();
+	
+	TrackingID[t] = id;
+	Target[t] = TMem;
+};
+
+void UCAN_UCANWatchStack::unTrackID(int id, float* TMem)
+{
+	int t = 0;
+	
+	if (IsDuplicate(id, TMem) == false)
+	{
+		return;
+	};
+	
+	t = FindEmptyPosition();
+	
+	TrackingID[t] = 0;
+	Target[t] = 0;
+};
