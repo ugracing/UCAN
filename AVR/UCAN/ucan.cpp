@@ -1012,7 +1012,7 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 		c ++;
 	};
 	
-	MCPCANBus->sendMsgBuf(MSG.Address, 0, 8, txBuff);
+	MCPCANBus->sendMsgBuf(CAN_ID, 0, 8, txBuff);
 };
 
 
@@ -1069,6 +1069,8 @@ void UCAN_UCANHandler::Announce(uint8_t flag, int data)
 	MSG.Data[0] = flag;
 	MSG.Data[1] = b[0];
 	MSG.Data[2] = b[1];
+	
+	SendMessage(MSG);
 };
 
 void UCAN_UCANHandler::Initialize(void)
