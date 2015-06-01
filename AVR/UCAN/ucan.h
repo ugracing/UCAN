@@ -90,7 +90,7 @@
 			INT8U sendMsg();                                                /* send message                 */
 
 		public:
-			MCP_CAN(INT8U _CS);
+			void Initialize(INT8U _CS);
 			INT8U begin(INT8U speedset);                              /* init can                     */
 			INT8U init_Mask(INT8U num, INT8U ext, INT32U ulData);           /* init Masks                   */
 			INT8U init_Filt(INT8U num, INT8U ext, INT32U ulData);           /* init filters                 */
@@ -102,6 +102,7 @@
 	};
 
 	#include "ucandefine.h"
+	#include "ucandebug.h"
 
 
 	/* WARNING FOR XXX-HIGHMEM library users:
@@ -170,10 +171,11 @@
 	class UCAN_UCANHandler //Stub Started
 	{
 		private:
-			MCP_CAN* MCPCANBus;
+			MCP_CAN MCPCANBus;
 			bool Initialized;
 			int CAN_ID;
 			void* MainCall;
+			int BootSecret;
 			
 			uint8_t UCANStackMode;
 			uint8_t UCANFeedMode;
@@ -192,9 +194,10 @@
 			void MSGDispatcher(UCANMessage MSG);
 			void MSGProcessor_InfoServ(UCANMessage MSG);
 			void MSGProcessor_DataServ(UCANMessage MSG);
-			void Announce(uint8_t flag, int data);
 			
 		public:
+			void Chan0_Announce(uint8_t flag);
+			void Chan0_Request(uint8_t flag, int data);
 			void HandlerMode(int Mode);
 			void SetID(int ID);
 			void FeedMode(int Mode);

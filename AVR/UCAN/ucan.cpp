@@ -503,7 +503,7 @@ INT8U MCP_CAN::mcp2515_getNextFreeTXBuf(INT8U *txbuf_n)                 /* get N
 ** Function name:           set CS
 ** Descriptions:            init CS pin and set UNSELECTED
 *********************************************************************************************************/
-MCP_CAN::MCP_CAN(INT8U _CS)
+void MCP_CAN::Initialize(INT8U _CS)
 {
     SPICS = _CS;
     pinMode(SPICS, OUTPUT);
@@ -986,9 +986,9 @@ UCANMessage UCAN_UCANHandler::CAN_FetchMsgFromCAN(void)
 	
 	if (!CAN_IsMessagePending)
 	{
-		MCPCANBus->readMsgBuf(&rxLen, rxBuf);
+		MCPCANBus.readMsgBuf(&rxLen, rxBuf);
 		
-		ReturnMSG.Address = MCPCANBus->getCanId();
+		ReturnMSG.Address = MCPCANBus.getCanId();
 		ReturnMSG.Channel = rxBuf[0];
 		while (c <= 7)
 		{
@@ -1012,15 +1012,36 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 		c ++;
 	};
 	
-	MCPCANBus->sendMsgBuf(CAN_ID, 0, 8, txBuff);
+	MCPCANBus.sendMsgBuf(CAN_ID, 0, 8, txBuff);
 };
-
 
 void DebugMSG(int MSG)
 {
 	#ifndef RELEASE
-		Serial.print('DBGCODE-');
+		Serial.print("DBGCODE ");
 		Serial.println(MSG);
+	#endif
+};
+
+void DebugMSG(int MSG, int data)
+{
+	#ifndef RELEASE
+		Serial.print("DBGCODE ");
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.println(data);
+	#endif
+};
+
+void DebugMSG(int MSG, int data, int extdata)
+{
+	#ifndef RELEASE
+		Serial.print("DBGCODE ");
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.print(data);
+		Serial.print(" ");
+		Serial.print(extdata);
 	#endif
 };
 
@@ -1053,29 +1074,73 @@ void UCAN_UCANHandler::SendMessage(UCANMessage msg)
 	CAN_SendMSG(msg);
 };
 
-void UCAN_UCANHandler::Announce(uint8_t flag, int data)
+void UCAN_UCANHandler::Chan0_Announce(uint8_t flag)
 {
+	UCANMessage MSG;
+	
+	MSG.Channel = 0;
+	MSG.Data[0] = 0; //TypeID 0 is an announce
+	MSG.Data[1] = flag;
+	
+	SendMessage(MSG);
+	
+	DebugMSG(UCAN_Debug_Chan0Announce, flag);
+};
+
+void UCAN_UCANHandler::Chan0_Request(uint8_t flag, int data)
+{
+	UCANMessage MSG;
+	
 	union
 	{
 		int i16;
 		uint8_t b[2];
 	};
 	
-	UCANMessage MSG;
-	
 	i16 = data;
 	
 	MSG.Channel = 0;
-	MSG.Data[0] = flag;
-	MSG.Data[1] = b[0];
-	MSG.Data[2] = b[1];
+	MSG.Data[0] = 1; //TypeID 1 is a request
+	MSG.Data[1] = flag;
+	MSG.Data[2] = b[0];
+	MSG.Data[3] = b[1];
 	
 	SendMessage(MSG);
+	
+	DebugMSG(UCAN_Debug_Chan0Request, flag, data);
 };
 
 void UCAN_UCANHandler::Initialize(void)
 {
-	MCPCANBus = &MCP_CAN(UCAN_MCPRXPin);
+	int c = 0;
+	int t = 0;
+	int x = 0;
+	
+	//We will need a unique secret to this device for identification
+	randomSeed(analogRead(A6));
+	t = random(1000);
+	
+	//We should pick up some electrical noise...
+	//So we will get lots of it and use it to seed the RNG
+	while (c < t)
+	{
+		x = analogRead(A6);
+		randomSeed(x);
+		delayMicroseconds(x);
+		
+		c ++;
+	};
+	
+	if (Initialized == true)
+	{
+		return;
+	};
+	
+	DebugMSG(UCAN_Debug_Boot);
+	DebugMSG(UCAN_Debug_Call_Init);
+	
+	MCPCANBus.Initialize(UCAN_MCPRXPin);
+	
 	if (CAN_ID <= 0)
 	{
 		DebugMSG(UCAN_Debug_BadID);
@@ -1083,13 +1148,22 @@ void UCAN_UCANHandler::Initialize(void)
 		return;
 	};
 	
-	if (MCPCANBus->begin(CAN_500KBPS) != CAN_OK)
+	if (MCPCANBus.begin(CAN_500KBPS) != CAN_OK)
 	{
 		DebugMSG(UCAN_Debug_BadCANInit);
 	};
 	
+	//Can bus initialization can vary in time...
+	//Get a more random number...
+	while (c > 10)
+	{
+		c = random(500);
+	};
+	BootSecret = random(65535); //It will overflow randomly. Which is okay!
+	DebugMSG(UCAN_Debug_BootSecret, BootSecret);
+	
 	//Let other devices we are joining the bus
-	Announce(0, 0); //Send an announce on Flag 0, Data = 0
+	Chan0_Announce(1); //Send an announce on Flag 0, Data = 0
 	
 	//See implementation note above
 	//RequestCanID(2047);
@@ -1150,6 +1224,7 @@ void UCAN_UCANHandler::StackMode(int Mode)
 
 void UCAN_UCANHandler::WatchValue_f32(int ValueID, float* f32Pointer)
 {
+	DebugMSG(UCAN_Debug_WatchCall_f32);
 	TrackingStack.TrackID(ValueID, f32Pointer);
 };
 
@@ -1356,11 +1431,14 @@ int UCAN_UCANWatchStack::FindEmptyPosition()
 	{
 		if (!Target[c])
 		{
+			DebugMSG(UCAN_Debug_StackCallW_FEMPT, c);
 			return c;
 		};
 		c ++;
 	};
 	return 0; //Keeps things alive in case of bad code
+	
+	DebugMSG(UCAN_Debug_StackCallW_FEMPT, 0);
 };
 
 void UCAN_UCANWatchStack::TrackID(int id, float* TMem)
@@ -1376,6 +1454,8 @@ void UCAN_UCANWatchStack::TrackID(int id, float* TMem)
 	
 	TrackingID[t] = id;
 	Target[t] = TMem;
+	
+	DebugMSG(UCAN_Debug_StackCallW_ADD, t);
 };
 
 void UCAN_UCANWatchStack::unTrackID(int id, float* TMem)
@@ -1391,4 +1471,6 @@ void UCAN_UCANWatchStack::unTrackID(int id, float* TMem)
 	
 	TrackingID[t] = 0;
 	Target[t] = 0;
+	
+	DebugMSG(UCAN_Debug_StackCallW_DEL, t);
 };
