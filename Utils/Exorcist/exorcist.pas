@@ -6,6 +6,7 @@ uses
 	axis_isce,
 	CBU_CommandLine,
 	PM_Utils,
+	PM_TextUtils,
 	crt;
 
 type
@@ -116,12 +117,38 @@ begin
 	writeln('[done!]');
 end;
 
+procedure Init_Unlock();
+var
+	Suffix: ANSIString;
+	LFile: Text;
+	
+begin
+	Suffix := TgtPort[Length(TgtPort) - 3..Length(TgtPort)];
+	if DoesFileExist('/var/lock/LCK..tty' + Suffix) = True then
+		begin
+			writeln('Cleaning [','/var/lock/LCK..tty' + Suffix,']...');
+			{$I-}
+				Assign(LFile, '/var/lock/LCK..tty' + Suffix);
+				Erase(LFile);
+				Close(LFile);
+			{$I+}
+			writeln('Cleaned lock file [','/var/lock/LCK..tty' + Suffix,']');
+		end;
+end;
+
 procedure Init_DBGAlias();
 begin
 	LoadDBGCodes('ucandebug.h');
 end;
 
+procedure Colourizer(Line: ANSIString);
 begin
+	if FindOccurencesInString(Upcase(Line), 'ERROR') > 0 then
+		TextColor(Red);
+end;
+
+begin
+	ClrScr();
 	writeln('UCAN Debug Helper - Exorcist');
 	
 	ObjInit('Initialize ISCE', @Link.Initialize);
@@ -133,6 +160,8 @@ begin
 	
 	write('Connection port:');
 	readln(TgtPort);
+	CorInit('Clearing relevant lock files', @Init_Unlock);
+
 	writeln('Connecting to ',TgtPort,' with:');
 	writeln('	bits    : 8');
 	writeln('	baud    : 9600');
@@ -158,11 +187,13 @@ begin
 				if CmdIn.Data[2] = 'UCAN_Debug_Boot' then
 					begin
 						writeln('');
-						writeln('Detected UCAN device reboot!');
+						writeln('Detected UCAN boot message!');
 						writeln('');
 						StartTime := GetTime();
 					end;
+				Colourizer(CmdIn.GetAsHumanString());
 				writeln(GetTime() - StartTime,': ',CmdIn.GetAsHumanString());
+				TextColor(Lightgray);
 			end;
 		
 		if Keypressed() then
