@@ -85,6 +85,7 @@ begin
 			end;
 		
 		until c >= DBGCodeDB.DLength;
+	ResolveDBGCode := Code;
 end;
 
 procedure CorInit(Msg: ANSIString; Tgt: Proc);
