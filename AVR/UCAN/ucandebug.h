@@ -6,8 +6,8 @@
 #define UCAN_Debug_Boot					4
 #define UCAN_Debug_BootSecret			5
 
-#define UCAN_Debug_BadID				10
-#define UCAN_Debug_BadCANInit			11
+#define UCAN_Debug_ERROR_BadID			10
+#define UCAN_Debug_ERROR_BadCANInit		11
 
 #define UCAN_Debug_Chan0Announce		20
 #define UCAN_Debug_Chan0Request			21
@@ -18,3 +18,7 @@
 #define UCAN_Debug_StackCallW_DEL		103
 #define UCAN_Debug_StackCallW_FEMPT		104
 #define UCAN_Debug_StackCallW_FDUP		105
+#define UCAN_Debug_Call_SetID			106
+#define UCAN_Debug_Call_HandlerMode		107
+#define UCAN_Debug_Call_StackMode		108
+#define UCAN_Debug_Call_FeedMode		109

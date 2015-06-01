@@ -7,8 +7,8 @@
 //4 messages in queue should be enough for everyone at 8 bytes a pop on a 2K system.
 #define UCAN_MSGStack_Size				4
 
-//Allow tracking of 16 different parameters (2 bytes each)
-#define UCAN_FeedStack_Size				16
+//Allow tracking of 16 different parameters (4 bytes each)
+#define UCAN_FeedStack_Size				8
 
 //The amount of time in ms that can elapse before UCAN gives up on an operation
 #define UCAN_UCANOperationTimeout		5

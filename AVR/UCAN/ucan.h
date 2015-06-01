@@ -174,7 +174,6 @@
 			MCP_CAN MCPCANBus;
 			bool Initialized;
 			int CAN_ID;
-			void* MainCall;
 			int BootSecret;
 			
 			uint8_t UCANStackMode;
@@ -212,6 +211,14 @@
 			
 			uint8_t NewStreamDUID(void);
 	};
+	
+	void UCANCallInterrupt_Default();
+	
+	#ifndef UCAN_h_Globals
+		#define UCAN_h_Globals
+		
+		extern UCAN_UCANHandler UCAN;
+	#endif
 
 
 

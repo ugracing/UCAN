@@ -1041,13 +1041,13 @@ void DebugMSG(int MSG, int data, int extdata)
 		Serial.print(" ");
 		Serial.print(data);
 		Serial.print(" ");
-		Serial.print(extdata);
+		Serial.println(extdata);
 	#endif
 };
 
-
 void UCAN_UCANHandler::SetID(int ID)
 {
+	DebugMSG(UCAN_Debug_Call_SetID, ID);
 	if (ID > 0 && ID <= 2047)
 	{
 		CAN_ID = ID;
@@ -1116,6 +1116,12 @@ void UCAN_UCANHandler::Initialize(void)
 	int t = 0;
 	int x = 0;
 	
+	if (Initialized == true)
+	{
+		return;
+	};
+	DebugMSG(UCAN_Debug_Call_Init);
+	
 	//We will need a unique secret to this device for identification
 	randomSeed(analogRead(A6));
 	t = random(1000);
@@ -1131,26 +1137,18 @@ void UCAN_UCANHandler::Initialize(void)
 		c ++;
 	};
 	
-	if (Initialized == true)
-	{
-		return;
-	};
-	
-	DebugMSG(UCAN_Debug_Boot);
-	DebugMSG(UCAN_Debug_Call_Init);
-	
 	MCPCANBus.Initialize(UCAN_MCPRXPin);
 	
 	if (CAN_ID <= 0)
 	{
-		DebugMSG(UCAN_Debug_BadID);
+		DebugMSG(UCAN_Debug_ERROR_BadID);
 		Empty();
 		return;
 	};
 	
 	if (MCPCANBus.begin(CAN_500KBPS) != CAN_OK)
 	{
-		DebugMSG(UCAN_Debug_BadCANInit);
+		DebugMSG(UCAN_Debug_ERROR_BadCANInit);
 	};
 	
 	//Can bus initialization can vary in time...
@@ -1168,6 +1166,8 @@ void UCAN_UCANHandler::Initialize(void)
 	//See implementation note above
 	//RequestCanID(2047);
 	
+	attachInterrupt(0, MainCall, CHANGE);
+	
 	Initialized = true;
 };
 
@@ -1176,9 +1176,15 @@ void UCAN_UCANHandler::Empty(void)
 	DebugMSG(UCAN_Debug_Stub);
 };
 
+void UCANCallInterrupt_Default()
+{
+	UCAN.Main();
+};
 
 void UCAN_UCANHandler::HandlerMode(int Mode)
 {
+	DebugMSG(UCAN_Debug_Call_HandlerMode, Mode);
+	
 	if (Mode > 0)
 	{
 		UCANCallMode = Mode;
@@ -1187,7 +1193,7 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 	if (UCANCallMode == UCAN_CallMode_FullAuto)
 	{
 		//Attach UCANHandler.main() to CAN interrupt
-		//attachInterrupt(0, this.Main, CHANGE);
+		MainCall = UCANCallInterrupt_Default;
 	};
 	
 	if (UCANCallMode == UCAN_CallMode_ContAuto)
@@ -1208,6 +1214,7 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 
 void UCAN_UCANHandler::FeedMode(int Mode)
 {
+	DebugMSG(UCAN_Debug_Call_FeedMode, Mode);
 	if (Mode >= 0)
 	{
 		UCANFeedMode = Mode;
@@ -1216,6 +1223,7 @@ void UCAN_UCANHandler::FeedMode(int Mode)
 
 void UCAN_UCANHandler::StackMode(int Mode)
 {
+	DebugMSG(UCAN_Debug_Call_StackMode, Mode);
 	if (Mode >= 0)
 	{
 		UCANStackMode = Mode;
@@ -1224,13 +1232,14 @@ void UCAN_UCANHandler::StackMode(int Mode)
 
 void UCAN_UCANHandler::WatchValue_f32(int ValueID, float* f32Pointer)
 {
-	DebugMSG(UCAN_Debug_WatchCall_f32);
+	DebugMSG(UCAN_Debug_WatchCall_f32, ValueID, (uint16_t)f32Pointer);
 	TrackingStack.TrackID(ValueID, f32Pointer);
 };
 
 bool UCAN_UCANHandler::IsMessagePending(void)
 {
 	int c = 0;
+	
 	while (c < UCAN_MSGStack_Size)
 	{
 		if (MSGStack.InUse[c] == true)
@@ -1245,6 +1254,7 @@ bool UCAN_UCANHandler::IsMessagePending(void)
 UCANMessage UCAN_UCANHandler::GetNextMessage(void)
 {
 	UCANMessage Buffer;
+	
 	int c = 0;
 	while (c < UCAN_MSGStack_Size)
 	{
@@ -1426,15 +1436,15 @@ bool UCAN_UCANWatchStack::IsDuplicate(int id, float* TMem)
 
 int UCAN_UCANWatchStack::FindEmptyPosition()
 {
-	int c = 0;
-	while (c < UCAN_FeedStack_Size)
+	int c = UCAN_FeedStack_Size;
+	while (c >= 0)
 	{
+		c --;
 		if (!Target[c])
 		{
 			DebugMSG(UCAN_Debug_StackCallW_FEMPT, c);
 			return c;
 		};
-		c ++;
 	};
 	return 0; //Keeps things alive in case of bad code
 	
@@ -1474,3 +1484,5 @@ void UCAN_UCANWatchStack::unTrackID(int id, float* TMem)
 	
 	DebugMSG(UCAN_Debug_StackCallW_DEL, t);
 };
+
+UCAN_UCANHandler UCAN;
