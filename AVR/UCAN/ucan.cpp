@@ -1166,7 +1166,8 @@ void UCAN_UCANHandler::Initialize(void)
 	//See implementation note above
 	//RequestCanID(2047);
 	
-	attachInterrupt(0, MainCall, CHANGE);
+	pinMode(2, INPUT);
+	attachInterrupt(INT0, UCANCallInterrupt_Default, CHANGE);
 	
 	Initialized = true;
 };
@@ -1193,7 +1194,7 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 	if (UCANCallMode == UCAN_CallMode_FullAuto)
 	{
 		//Attach UCANHandler.main() to CAN interrupt
-		MainCall = UCANCallInterrupt_Default;
+		//MainCall = UCANCallInterrupt_Default;
 	};
 	
 	if (UCANCallMode == UCAN_CallMode_ContAuto)
@@ -1300,9 +1301,28 @@ void UCAN_UCANHandler::FetchNewMessages(void)
 
 void UCAN_UCANHandler::MSGProcessor_DataServ(UCANMessage MSG)
 {
+	float f;
+	int i;
+	int ID;
+	
 	switch (MSG.Data[0])
 	{
-		case 0:
+		case UCAN_ChanType_1_f32:
+				//If anyone knows how to do better array splicing in c - please fix this!
+				ID = Bytes16ToInt(&MSG.Data[1]);
+				f = Bytes32ToFloat(&MSG.Data[3]); //This is ugly!
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_f32, ID, f);
+				
+				TrackingStack.UpdateIDValue(ID, f);
+			break;
+			
+		case UCAN_ChanType_1_i16:
+				//If anyone knows how to do better array splicing in c - please fix this!
+				ID = Bytes16ToInt(&MSG.Data[1]);
+				f = Bytes16ToInt(&MSG.Data[3]); //This is ugly!
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_i16, ID, f);
+				
+				TrackingStack.UpdateIDValue(ID, f);
 			break;
 	};
 };
@@ -1347,6 +1367,7 @@ void UCAN_UCANHandler::ProcessMSGTriggers(void)
 
 void UCAN_UCANHandler::Main(void)
 {
+	DebugMSG(UCAN_Debug_Call_Main);
 	FetchNewMessages();
 	ProcessMSGTriggers();
 	//ProcessUCANOperations(); //Not yet implemented
@@ -1483,6 +1504,87 @@ void UCAN_UCANWatchStack::unTrackID(int id, float* TMem)
 	Target[t] = 0;
 	
 	DebugMSG(UCAN_Debug_StackCallW_DEL, t);
+};
+
+void UCAN_UCANWatchStack::UpdateIDValue(int ID, float Value)
+{
+	int c = 0;
+	while (c < UCAN_FeedStack_Size)
+	{
+		if (TrackingID[c] == ID && Target[c])
+		{
+			DebugMSG(UCAN_Debug_StackCallW_UPDAT, (int)Target[c], Value);
+			*Target[c] = Value;
+		};
+		
+		c ++;
+	};
+};
+
+float Bytes32ToFloat(uint8_t b32[4])
+{
+	union
+	{
+		float f32;
+		uint8_t b[4];
+	};
+	
+	int c = 0;
+	while (c < 4)
+	{
+		b[c] = b32[c];
+		c ++;
+	};
+	
+	return f32;
+};
+
+uint8_t BytesFromFloat(float f, uint8_t ByteNumber)
+{
+	union
+	{
+		float f32;
+		uint8_t b[4];
+	};
+	
+	if (ByteNumber < 0) ByteNumber = 0;
+	else if (ByteNumber > 3) ByteNumber = 3;
+	
+	f32 = f;
+	return b[ByteNumber];
+};
+
+int Bytes16ToInt(uint8_t b16[2])
+{
+	union
+	{
+		int i16;
+		uint8_t b[2];
+	};
+	
+	int c = 0;
+	while (c < 2)
+	{
+		b[c] = b16[c];
+		c ++;
+	};
+	
+	return i16;
+};
+
+uint8_t BytesFromInt(int i, uint8_t ByteNumber)
+{
+	union
+	{
+		int i16;
+		uint8_t b[2];
+	};
+	
+	if (ByteNumber < 0) ByteNumber = 0;
+	else if (ByteNumber > 2) ByteNumber = 2;
+	
+	i16 = i;
+	return b[ByteNumber];
 };
 
 UCAN_UCANHandler UCAN;

@@ -35,7 +35,7 @@
 	//The MCP interface code
 	#include "mcp_can_dfs.h"
 	#define MAX_CHAR_IN_MESSAGE 8
-
+	
 	class MCP_CAN
 	{
 		private:
@@ -148,6 +148,7 @@
 			int FindTargetPosition(float* LMem);
 			void Empty(void);
 			void Initialize(void);
+			void UpdateIDValue(int ID, float value);
 	};
 
 	UCANMessage UCAN_EmptyMessage(void);
@@ -211,6 +212,12 @@
 			
 			uint8_t NewStreamDUID(void);
 	};
+	
+	float Bytes32ToFloat(uint8_t b32[4]);
+	uint8_t BytesFromFloat(float f, uint8_t ByteNumber);
+	
+	int Bytes16ToInt(uint8_t b16[2]);
+	uint8_t BytesFromInt(int i, uint8_t ByteNumber);
 	
 	void UCANCallInterrupt_Default();
 	

@@ -22,3 +22,7 @@
 #define UCAN_Debug_Call_HandlerMode		107
 #define UCAN_Debug_Call_StackMode		108
 #define UCAN_Debug_Call_FeedMode		109
+#define UCAN_Debug_Call_Main			110
+#define UCAN_Debug_RECV_Ch1_DServ_f32	111
+#define UCAN_Debug_RECV_Ch1_DServ_i16	112
+#define UCAN_Debug_StackCallW_UPDAT		113
