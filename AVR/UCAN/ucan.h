@@ -153,6 +153,8 @@
 
 	UCANMessage UCAN_EmptyMessage(void);
 	void DebugMSG(int MSG);
+	void DebugMSG(int MSG, int data);
+	void DebugMSG(UCANMessage MSG);
 
 	class UCAN_UCANMSGStack //Initial implementation complete
 	{
@@ -185,7 +187,7 @@
 			UCAN_UCANWatchStack TrackingStack;
 			
 			void RequestCANID(int ID);
-			void SendMessage(UCANMessage msg);
+			
 			void IntProc_RXHandler(void);
 			void FetchNewMessages(void);
 			UCANMessage CAN_FetchMsgFromCAN(void);
@@ -194,6 +196,8 @@
 			void MSGDispatcher(UCANMessage MSG);
 			void MSGProcessor_InfoServ(UCANMessage MSG);
 			void MSGProcessor_DataServ(UCANMessage MSG);
+			void SendMessage(UCANMessage msg);
+			bool CAN_IsMessagePending(void);
 			
 		public:
 			void Chan0_Announce(uint8_t flag);
@@ -205,6 +209,7 @@
 			void Initialize(void);
 			void Empty(void);
 			void WatchValue_f32(int Value, float* f32Pointer);
+			void SendValue_f32(int Value, float f32);
 			void Main(void);
 			bool IsMessagePending(void);
 			UCANMessage GetNextMessage(void);
@@ -213,10 +218,10 @@
 			uint8_t NewStreamDUID(void);
 	};
 	
-	float Bytes32ToFloat(uint8_t b32[4]);
+	float Bytes32ToFloat(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4);
 	uint8_t BytesFromFloat(float f, uint8_t ByteNumber);
 	
-	int Bytes16ToInt(uint8_t b16[2]);
+	int Bytes16ToInt(uint8_t b16_1, uint8_t b16_2);
 	uint8_t BytesFromInt(int i, uint8_t ByteNumber);
 	
 	void UCANCallInterrupt_Default();

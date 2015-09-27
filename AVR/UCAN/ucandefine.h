@@ -1,6 +1,11 @@
 #define UCAN_h
 
-#define UCAN_MCPRXPin					10 //NOT FINAL
+#define UCAN_MCPCSPin					10 //NOT FINAL
+//#define UCAN_MCPCSPin					9 //For post-jim hw
+
+//WARNING: Changing the INT pin means changing the UCAN interrupt. See ucan.cpp
+#define UCAN_MCPIntPin					2 //pin connected to MCP2515 INT [Low when data ready by default]
+#define UCAN_MCPResetPin				4
 
 //   AVR-LOWMem specific stuff. Tweak this at your own risk of breaking UCAN.
 
@@ -20,8 +25,10 @@
 #define UCAN_CallMode_ContManual		3
 
 #define UCAN_FeedMode_Auto				0
+#define UCAN_FeedMode_Manual			1
 
 #define UCAN_StackMode_Auto				0
+#define UCAN_StackMode_Manual			1
 
 #define UCAN_Version_Family				1
 #define UCAN_Version_Major				1
@@ -74,3 +81,6 @@
 
 //UCAN Operation descriptors:
 #define UCAN_ChanOp_2_WaitForDUIDRPY	1
+
+//UCAN Announce flags
+#define UCAN_Announce_BUSJoin			1

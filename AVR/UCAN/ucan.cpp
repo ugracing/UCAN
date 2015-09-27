@@ -825,17 +825,20 @@ void UCAN_UCANMSGStack::StoreMessage(int n, UCANMessage MSG)
 	if (n >= 0 && n < UCAN_MSGStack_Size)
 	{
 		Data[n] = MSG;
+		InUse[n] = true;
 	};
 };
 
 void UCAN_UCANFeedStack::TrackID(int id)
 {
+	int n;
+	
 	if (IsIDTracked(id) == true)
 	{
 		return;
 	};
 	
-	int n = FindIDPosition(-1); //-1 is put into available slots
+	n = FindIDPosition(-1); //-1 is put into available slots
 	
 	if (n >= 0)
 	{
@@ -961,15 +964,23 @@ void UCAN_UCANMSGStack::Initialize(void)
 	};
 };
 
-bool CAN_IsMessagePending(void)
+bool UCAN_UCANHandler::CAN_IsMessagePending(void)
 {
 	// On Arduino/AVR we get a pin written to 0 whenever we have CAN data waiting to be read.
-	if (digitalRead(UCAN_MCPRXPin) == LOW)
+	if (digitalRead(UCAN_MCPIntPin) == LOW)
 	{
+		DebugMSG(UCAN_Debug_CANPending, 2);
+		return true;
+	};
+	
+	if (MCPCANBus.checkReceive() == CAN_MSGAVAIL)
+	{
+		DebugMSG(UCAN_Debug_CANPending, 1);
 		return true;
 	}
 	else
 	{
+		DebugMSG(UCAN_Debug_CANPending, -1);
 		return false;
 	};
 };
@@ -984,7 +995,7 @@ UCANMessage UCAN_UCANHandler::CAN_FetchMsgFromCAN(void)
 	
 	ReturnMSG = UCAN_EmptyMessage();
 	
-	if (!CAN_IsMessagePending)
+	if (CAN_IsMessagePending() == true)
 	{
 		MCPCANBus.readMsgBuf(&rxLen, rxBuf);
 		
@@ -1008,8 +1019,8 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 	txBuff[0] = MSG.Channel;
 	while (c <= 7)
 	{
-		txBuff[c + 1] = MSG.Data[c];
 		c ++;
+		txBuff[c] = MSG.Data[c];
 	};
 	
 	MCPCANBus.sendMsgBuf(CAN_ID, 0, 8, txBuff);
@@ -1018,7 +1029,7 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 void DebugMSG(int MSG)
 {
 	#ifndef RELEASE
-		Serial.print("DBGCODE ");
+		Serial.print(UCAN_Debug_DebugSTRID);
 		Serial.println(MSG);
 	#endif
 };
@@ -1026,7 +1037,17 @@ void DebugMSG(int MSG)
 void DebugMSG(int MSG, int data)
 {
 	#ifndef RELEASE
-		Serial.print("DBGCODE ");
+		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.println(data);
+	#endif
+};
+
+void DebugMSG(int MSG, float data)
+{
+	#ifndef RELEASE
+		Serial.print(UCAN_Debug_DebugSTRID);
 		Serial.print(MSG);
 		Serial.print(" ");
 		Serial.println(data);
@@ -1036,7 +1057,37 @@ void DebugMSG(int MSG, int data)
 void DebugMSG(int MSG, int data, int extdata)
 {
 	#ifndef RELEASE
-		Serial.print("DBGCODE ");
+		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.print(data);
+		Serial.print(" ");
+		Serial.println(extdata);
+	#endif
+};
+void DebugMSG(UCANMessage MSG)
+{
+	#ifndef RELEASE
+		uint8_t c = 0;
+		
+		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(MSG.Address);
+		Serial.print(" ");
+		Serial.print(MSG.Channel);
+		while (c < 7)
+		{
+			Serial.print(" ");
+			Serial.println(MSG.Data[c]);
+			
+			c++;
+		};
+	#endif
+};
+
+void DebugMSG(int MSG, int data, float extdata)
+{
+	#ifndef RELEASE
+		Serial.print(UCAN_Debug_DebugSTRID);
 		Serial.print(MSG);
 		Serial.print(" ");
 		Serial.print(data);
@@ -1116,11 +1167,23 @@ void UCAN_UCANHandler::Initialize(void)
 	int t = 0;
 	int x = 0;
 	
+	delay(50);
+	pinMode(UCAN_MCPResetPin, OUTPUT);
+	digitalWrite(UCAN_MCPResetPin, LOW);
+	delay(100);
+	digitalWrite(UCAN_MCPResetPin, HIGH);
+	
 	if (Initialized == true)
 	{
 		return;
 	};
 	DebugMSG(UCAN_Debug_Call_Init);
+	
+	delay(50);
+	pinMode(UCAN_MCPResetPin, OUTPUT);
+	digitalWrite(UCAN_MCPResetPin, LOW);
+	delay(100);
+	digitalWrite(UCAN_MCPResetPin, HIGH);
 	
 	//We will need a unique secret to this device for identification
 	randomSeed(analogRead(A6));
@@ -1137,7 +1200,7 @@ void UCAN_UCANHandler::Initialize(void)
 		c ++;
 	};
 	
-	MCPCANBus.Initialize(UCAN_MCPRXPin);
+	MCPCANBus.Initialize(UCAN_MCPCSPin);
 	
 	if (CAN_ID <= 0)
 	{
@@ -1160,14 +1223,14 @@ void UCAN_UCANHandler::Initialize(void)
 	BootSecret = random(65535); //It will overflow randomly. Which is okay!
 	DebugMSG(UCAN_Debug_BootSecret, BootSecret);
 	
-	//Let other devices we are joining the bus
+	//Let other devices know we are joining the bus
 	Chan0_Announce(1); //Send an announce on Flag 0, Data = 0
 	
 	//See implementation note above
 	//RequestCanID(2047);
 	
-	pinMode(2, INPUT);
-	attachInterrupt(INT0, UCANCallInterrupt_Default, CHANGE);
+	pinMode(UCAN_MCPIntPin, INPUT);
+	//attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
 	
 	Initialized = true;
 };
@@ -1233,8 +1296,25 @@ void UCAN_UCANHandler::StackMode(int Mode)
 
 void UCAN_UCANHandler::WatchValue_f32(int ValueID, float* f32Pointer)
 {
-	DebugMSG(UCAN_Debug_WatchCall_f32, ValueID, (uint16_t)f32Pointer);
+//	DebugMSG(UCAN_Debug_WatchCall_f32, ValueID, (uint16_t)f32Pointer);
 	TrackingStack.TrackID(ValueID, f32Pointer);
+};
+
+void UCAN_UCANHandler::SendValue_f32(int Value, float f32)
+{
+	UCANMessage msg;
+	
+	DebugMSG(UCAN_Debug_SendCall_f32, Value, f32);
+	
+	msg.Address = CAN_ID;
+	msg.Channel = 1;
+	msg.Data[0] = UCAN_ChanType_1_f32;
+	msg.Data[1] = BytesFromFloat(f32, 0);
+	msg.Data[2] = BytesFromFloat(f32, 1);
+	msg.Data[3] = BytesFromFloat(f32, 2);
+	msg.Data[4] = BytesFromFloat(f32, 3);
+	
+	SendMessage(msg);
 };
 
 bool UCAN_UCANHandler::IsMessagePending(void)
@@ -1289,13 +1369,24 @@ void UCAN_UCANHandler::FetchNewMessages(void)
 	*/
 	if (CAN_IsMessagePending() == true)
 	{
+		while (CAN_IsMessagePending() == true)
 		if (MSGStack.GetAvailableSlots() <= 0)
 		{
-			return;
+			if (MSGStack.GetAvailableSlots() <= 0)
+			{
+				return;
+			};
+			
+			slot = MSGStack.GetNextEmptySlot();
+			MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
 		};
 		
 		slot = MSGStack.GetNextEmptySlot();
 		MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
+		DebugMSG(UCAN_Debug_StoreMSG, slot);
+	}
+	else {
+		DebugMSG(UCAN_Debug_NoMSG);
 	};
 };
 
@@ -1309,8 +1400,8 @@ void UCAN_UCANHandler::MSGProcessor_DataServ(UCANMessage MSG)
 	{
 		case UCAN_ChanType_1_f32:
 				//If anyone knows how to do better array splicing in c - please fix this!
-				ID = Bytes16ToInt(&MSG.Data[1]);
-				f = Bytes32ToFloat(&MSG.Data[3]); //This is ugly!
+				ID = Bytes16ToInt(MSG.Data[1], MSG.Data[2]);
+				f = Bytes32ToFloat(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]); //This is ugly!
 				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_f32, ID, f);
 				
 				TrackingStack.UpdateIDValue(ID, f);
@@ -1318,8 +1409,8 @@ void UCAN_UCANHandler::MSGProcessor_DataServ(UCANMessage MSG)
 			
 		case UCAN_ChanType_1_i16:
 				//If anyone knows how to do better array splicing in c - please fix this!
-				ID = Bytes16ToInt(&MSG.Data[1]);
-				f = Bytes16ToInt(&MSG.Data[3]); //This is ugly!
+				ID = Bytes16ToInt(MSG.Data[1], MSG.Data[2]);
+				f = Bytes16ToInt(MSG.Data[3], MSG.Data[4]); //This is ugly!
 				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_i16, ID, f);
 				
 				TrackingStack.UpdateIDValue(ID, f);
@@ -1509,6 +1600,7 @@ void UCAN_UCANWatchStack::unTrackID(int id, float* TMem)
 void UCAN_UCANWatchStack::UpdateIDValue(int ID, float Value)
 {
 	int c = 0;
+	DebugMSG(UCAN_Debug_UpdateFeedStack, ID, Value);
 	while (c < UCAN_FeedStack_Size)
 	{
 		if (TrackingID[c] == ID && Target[c])
@@ -1521,7 +1613,7 @@ void UCAN_UCANWatchStack::UpdateIDValue(int ID, float Value)
 	};
 };
 
-float Bytes32ToFloat(uint8_t b32[4])
+float Bytes32ToFloat(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
 {
 	union
 	{
@@ -1529,12 +1621,10 @@ float Bytes32ToFloat(uint8_t b32[4])
 		uint8_t b[4];
 	};
 	
-	int c = 0;
-	while (c < 4)
-	{
-		b[c] = b32[c];
-		c ++;
-	};
+	b[0] = b32_1;
+	b[1] = b32_2;
+	b[2] = b32_3;
+	b[3] = b32_4;
 	
 	return f32;
 };
@@ -1554,7 +1644,7 @@ uint8_t BytesFromFloat(float f, uint8_t ByteNumber)
 	return b[ByteNumber];
 };
 
-int Bytes16ToInt(uint8_t b16[2])
+int Bytes16ToInt(uint8_t b16_1, uint8_t b16_2)
 {
 	union
 	{
@@ -1562,12 +1652,8 @@ int Bytes16ToInt(uint8_t b16[2])
 		uint8_t b[2];
 	};
 	
-	int c = 0;
-	while (c < 2)
-	{
-		b[c] = b16[c];
-		c ++;
-	};
+	b[0] = b16_1;
+	b[1] = b16_2;
 	
 	return i16;
 };
