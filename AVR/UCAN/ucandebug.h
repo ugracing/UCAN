@@ -34,5 +34,9 @@
 #define UCAN_Debug_StoreMSG				116
 #define UCAN_Debug_NoMSG				117
 #define UCAN_Debug_UpdateFeedStack		118
+#define UCAN_Debug_CANFetchMSG			119
+#define UCAN_Debug_Process_Data			120
+#define UCAN_Debug_MSGDispatch			121
+#define UCAN_Debug_BadPKTFormat			122
 
 #define UCAN_Debug_UserDebug_1			999

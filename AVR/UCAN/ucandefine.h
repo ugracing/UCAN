@@ -1,7 +1,7 @@
 #define UCAN_h
 
-#define UCAN_MCPCSPin					10 //NOT FINAL
-//#define UCAN_MCPCSPin					9 //For post-jim hw
+//#define UCAN_MCPCSPin					10 //NOT FINAL
+#define UCAN_MCPCSPin					9 //For post-jim hw
 
 //WARNING: Changing the INT pin means changing the UCAN interrupt. See ucan.cpp
 #define UCAN_MCPIntPin					2 //pin connected to MCP2515 INT [Low when data ready by default]

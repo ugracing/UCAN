@@ -993,6 +993,8 @@ UCANMessage UCAN_UCANHandler::CAN_FetchMsgFromCAN(void)
 	uint8_t rxAddress = 0;
 	UCANMessage ReturnMSG;
 	
+	DebugMSG(UCAN_Debug_CANFetchMSG);
+	
 	ReturnMSG = UCAN_EmptyMessage();
 	
 	if (CAN_IsMessagePending() == true)
@@ -1017,10 +1019,10 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 	uint8_t txBuff[8];
 	
 	txBuff[0] = MSG.Channel;
-	while (c <= 7)
+	while (c <= 6)
 	{
+		txBuff[c + 1] = MSG.Data[c];
 		c ++;
-		txBuff[c] = MSG.Data[c];
 	};
 	
 	MCPCANBus.sendMsgBuf(CAN_ID, 0, 8, txBuff);
@@ -1230,7 +1232,7 @@ void UCAN_UCANHandler::Initialize(void)
 	//RequestCanID(2047);
 	
 	pinMode(UCAN_MCPIntPin, INPUT);
-	//attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
+	attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
 	
 	Initialized = true;
 };
@@ -1309,10 +1311,12 @@ void UCAN_UCANHandler::SendValue_f32(int Value, float f32)
 	msg.Address = CAN_ID;
 	msg.Channel = 1;
 	msg.Data[0] = UCAN_ChanType_1_f32;
-	msg.Data[1] = BytesFromFloat(f32, 0);
-	msg.Data[2] = BytesFromFloat(f32, 1);
-	msg.Data[3] = BytesFromFloat(f32, 2);
-	msg.Data[4] = BytesFromFloat(f32, 3);
+	msg.Data[1] = BytesFromInt(Value, 0);
+	msg.Data[2] = BytesFromInt(Value, 1);
+	msg.Data[3] = BytesFromFloat(f32, 0);
+	msg.Data[4] = BytesFromFloat(f32, 1);
+	msg.Data[5] = BytesFromFloat(f32, 2);
+	msg.Data[6] = BytesFromFloat(f32, 3);
 	
 	SendMessage(msg);
 };
@@ -1330,6 +1334,8 @@ bool UCAN_UCANHandler::IsMessagePending(void)
 		
 		c ++;
 	};
+	
+	return false;
 };
 
 UCANMessage UCAN_UCANHandler::GetNextMessage(void)
@@ -1370,20 +1376,25 @@ void UCAN_UCANHandler::FetchNewMessages(void)
 	if (CAN_IsMessagePending() == true)
 	{
 		while (CAN_IsMessagePending() == true)
-		if (MSGStack.GetAvailableSlots() <= 0)
 		{
 			if (MSGStack.GetAvailableSlots() <= 0)
 			{
-				return;
+				if (MSGStack.GetAvailableSlots() <= 0)
+				{
+					return;
+				};
+				
+				slot = MSGStack.GetNextEmptySlot();
+				MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
+				MSGStack.InUse[slot] = true;
+				DebugMSG(UCAN_Debug_StoreMSG, slot);
 			};
 			
 			slot = MSGStack.GetNextEmptySlot();
 			MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
+			MSGStack.InUse[c] = true;
+			DebugMSG(UCAN_Debug_StoreMSG, slot);
 		};
-		
-		slot = MSGStack.GetNextEmptySlot();
-		MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
-		DebugMSG(UCAN_Debug_StoreMSG, slot);
 	}
 	else {
 		DebugMSG(UCAN_Debug_NoMSG);
@@ -1396,25 +1407,25 @@ void UCAN_UCANHandler::MSGProcessor_DataServ(UCANMessage MSG)
 	int i;
 	int ID;
 	
+	DebugMSG(UCAN_Debug_Process_Data, MSG.Data[0]);
 	switch (MSG.Data[0])
 	{
 		case UCAN_ChanType_1_f32:
-				//If anyone knows how to do better array splicing in c - please fix this!
 				ID = Bytes16ToInt(MSG.Data[1], MSG.Data[2]);
-				f = Bytes32ToFloat(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]); //This is ugly!
+				f = Bytes32ToFloat(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]);
 				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_f32, ID, f);
 				
 				TrackingStack.UpdateIDValue(ID, f);
 			break;
 			
 		case UCAN_ChanType_1_i16:
-				//If anyone knows how to do better array splicing in c - please fix this!
 				ID = Bytes16ToInt(MSG.Data[1], MSG.Data[2]);
-				f = Bytes16ToInt(MSG.Data[3], MSG.Data[4]); //This is ugly!
+				f = Bytes16ToInt(MSG.Data[3], MSG.Data[4]);
 				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_i16, ID, f);
 				
 				TrackingStack.UpdateIDValue(ID, f);
 			break;
+		DebugMSG(UCAN_Debug_BadPKTFormat);
 	};
 };
 
@@ -1429,6 +1440,7 @@ void UCAN_UCANHandler::MSGProcessor_InfoServ(UCANMessage MSG)
 
 void UCAN_UCANHandler::MSGDispatcher(UCANMessage MSG)
 {
+	DebugMSG(UCAN_Debug_MSGDispatch, MSG.Channel);
 	switch (MSG.Channel)
 	{
 		case 0:
@@ -1450,6 +1462,8 @@ void UCAN_UCANHandler::ProcessMSGTriggers(void)
 		if (MSGStack.IsMessageEmpty(c) == false)
 		{
 			MSGDispatcher(MSGStack.FetchMessage(c));
+			MSGStack.Data[c] = UCAN_EmptyMessage();
+			MSGStack.InUse[c] = false;
 		};
 		
 		c ++;
