@@ -38,5 +38,6 @@
 #define UCAN_Debug_Process_Data			120
 #define UCAN_Debug_MSGDispatch			121
 #define UCAN_Debug_BadPKTFormat			122
+#define UCAN_Debug_Call_GetNext_Clear	123
 
 #define UCAN_Debug_UserDebug_1			999

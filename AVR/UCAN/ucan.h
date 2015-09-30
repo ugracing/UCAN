@@ -27,7 +27,8 @@
  * 	use.
 */
 
-
+	//#define RELEASE
+	
 	#include "Arduino.h"
 	#include <SPI.h>
 	#include <inttypes.h>

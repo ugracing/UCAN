@@ -1073,16 +1073,18 @@ void DebugMSG(UCANMessage MSG)
 		uint8_t c = 0;
 		
 		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(" ");
 		Serial.print(MSG.Address);
 		Serial.print(" ");
 		Serial.print(MSG.Channel);
 		while (c < 7)
 		{
 			Serial.print(" ");
-			Serial.println(MSG.Data[c]);
+			Serial.print(MSG.Data[c]);
 			
 			c++;
 		};
+	Serial.println("");
 	#endif
 };
 
@@ -1135,6 +1137,9 @@ void UCAN_UCANHandler::Chan0_Announce(uint8_t flag)
 	MSG.Data[0] = 0; //TypeID 0 is an announce
 	MSG.Data[1] = flag;
 	
+	MSG.Data[5] = BytesFromInt(BootSecret, 0);
+	MSG.Data[6] = BytesFromInt(BootSecret, 1);
+	
 	SendMessage(MSG);
 	
 	DebugMSG(UCAN_Debug_Chan0Announce, flag);
@@ -1157,6 +1162,9 @@ void UCAN_UCANHandler::Chan0_Request(uint8_t flag, int data)
 	MSG.Data[1] = flag;
 	MSG.Data[2] = b[0];
 	MSG.Data[3] = b[1];
+	
+	MSG.Data[5] = BytesFromInt(BootSecret, 0);
+	MSG.Data[6] = BytesFromInt(BootSecret, 1);
 	
 	SendMessage(MSG);
 	
@@ -1202,6 +1210,7 @@ void UCAN_UCANHandler::Initialize(void)
 		c ++;
 	};
 	
+	DebugMSG(UCAN_Debug_Call_Init, 1);
 	MCPCANBus.Initialize(UCAN_MCPCSPin);
 	
 	if (CAN_ID <= 0)
@@ -1210,6 +1219,7 @@ void UCAN_UCANHandler::Initialize(void)
 		Empty();
 		return;
 	};
+	DebugMSG(UCAN_Debug_Call_Init, 10);
 	
 	if (MCPCANBus.begin(CAN_500KBPS) != CAN_OK)
 	{
@@ -1231,10 +1241,31 @@ void UCAN_UCANHandler::Initialize(void)
 	//See implementation note above
 	//RequestCanID(2047);
 	
-	pinMode(UCAN_MCPIntPin, INPUT);
-	attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
-	
+	pinMode(UCAN_MCPIntPin, INPUT);	
 	Initialized = true;
+	
+	if (UCANCallMode == UCAN_CallMode_FullAuto)
+	{
+		//Attach UCANHandler.main() to CAN interrupt
+		//attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
+	};
+	
+	if (UCANCallMode == UCAN_CallMode_ContAuto)
+	{
+		//Attach UCANHandler.main() to timer interrupt
+	};
+	
+	if (UCANCallMode == UCAN_CallMode_FullManual)
+	{
+		//Do not attach UCANHandler.main() to anything, ignore interrupt
+	};
+	
+	if (UCANCallMode == UCAN_CallMode_ContManual)
+	{
+		//UCANHandler.main() attached by user to interrupt
+	};
+	
+	DebugMSG(UCAN_Debug_Call_Init, 100);
 };
 
 void UCAN_UCANHandler::Empty(void)
@@ -1256,26 +1287,6 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 		UCANCallMode = Mode;
 	};
 	
-	if (UCANCallMode == UCAN_CallMode_FullAuto)
-	{
-		//Attach UCANHandler.main() to CAN interrupt
-		//MainCall = UCANCallInterrupt_Default;
-	};
-	
-	if (UCANCallMode == UCAN_CallMode_ContAuto)
-	{
-		//Attach UCANHandler.main() to timer interrupt
-	};
-	
-	if (UCANCallMode == UCAN_CallMode_FullManual)
-	{
-		//Do not attach UCANHandler.main() to anything, ignore interrupt
-	};
-	
-	if (UCANCallMode == UCAN_CallMode_ContManual)
-	{
-		//UCANHandler.main() attached by user to interrupt
-	};
 };
 
 void UCAN_UCANHandler::FeedMode(int Mode)
@@ -1351,7 +1362,8 @@ UCANMessage UCAN_UCANHandler::GetNextMessage(void)
 			if (UCANStackMode == UCAN_StackMode_Auto)
 			{
 				MSGStack.InUse[c] = false;
-				MSGStack.StoreMessage(c, UCAN_EmptyMessage());
+				MSGStack.Data[c] = UCAN_EmptyMessage();
+				DebugMSG(UCAN_Debug_Call_GetNext_Clear, c);
 			};
 			
 			return Buffer;
@@ -1435,6 +1447,12 @@ void UCAN_UCANHandler::MSGProcessor_InfoServ(UCANMessage MSG)
 	{
 		case 0:
 			break;
+		case 1: //catch new devices joining the bus
+				if (Bytes16ToInt(MSG.Data[5], MSG.Data[6]) != BootSecret) //check it is not our own announce
+				{
+					Chan0_Request(2, MSG.Address); //Send halt request to origin of packet
+				};
+			break;
 	};
 };
 
@@ -1472,9 +1490,17 @@ void UCAN_UCANHandler::ProcessMSGTriggers(void)
 
 void UCAN_UCANHandler::Main(void)
 {
+	if (Initialized == false)
+	{
+		return;
+	};
+	
 	DebugMSG(UCAN_Debug_Call_Main);
 	FetchNewMessages();
-	ProcessMSGTriggers();
+	if (UCANFeedMode != UCAN_FeedMode_Manual)
+	{
+		ProcessMSGTriggers();
+	};
 	//ProcessUCANOperations(); //Not yet implemented
 };
 
