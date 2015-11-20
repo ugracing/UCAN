@@ -2,6 +2,9 @@
 	#include <ucan.h>
 #endif
 
+// Michael's note: move guards to header file
+// Michael's note: remove semicolons after if statements, style?
+
 //MCP Interface code from MCP_CAN
 #define spi_readwrite SPI.transfer
 #define spi_read() spi_readwrite(0x00)
@@ -145,6 +148,7 @@ INT8U MCP_CAN::mcp2515_configRate(const INT8U canSpeed)
     set = 1;
     switch (canSpeed) 
     {
+		// Michael's note: lookup table?
         case (CAN_5KBPS):
         cfg1 = MCP_16MHz_5kBPS_CFG1;
         cfg2 = MCP_16MHz_5kBPS_CFG2;
@@ -897,6 +901,7 @@ int UCAN_UCANFeedStack::FindIDPosition(int id)
 
 void UCAN_UCANFeedStack::Initialize(void)
 {
+	// Michael's note: memset
 	int c = 0;
 	while (c <= UCAN_FeedStack_Size)
 	{
@@ -1029,6 +1034,16 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 };
 
 void DebugMSG(int16_t MSG)
+// Michael's note: could we make DebugMSG a macro like so:
+//
+// #ifdef RELEASE
+//		#define DEBUG_MSG(msg, data, extdata) /* nothing */
+// #else
+//		#define DEBUG_MSG(msg, data, extdata) DebugMSG(...)
+// #endif
+//
+
+// Michael's note: use C++ templates to combine these functions into one?
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1200,6 +1215,7 @@ void UCAN_UCANHandler::Chan0_Request(uint8_t flag, int data)
 	MSG.Data[2] = b[0];
 	MSG.Data[3] = b[1];
 	
+	// Michael's note: refactor this.
 	MSG.Data[5] = BytesFromi16(BootSecret, 0);
 	MSG.Data[6] = BytesFromi16(BootSecret, 1);
 	
@@ -1232,10 +1248,15 @@ void UCAN_UCANHandler::Initialize(void)
 	delay(100);
 	digitalWrite(UCAN_MCPResetPin, HIGH);
 	
+	// Michael's note: check distribution of analogRead calls (returns integers 1-1023)
+	// and try and change the loop into a maths function to ensure an even distribution.
+	// Is there a more foolproof way to solve the "force shutdown" problem of CAN nodes by ID, where
+	// the node shuts down itself?
+
 	//We will need a unique secret to this device for identification
 	randomSeed(analogRead(A6));
 	t = random(1000);
-	
+
 	//We should pick up some electrical noise...
 	//So we will get lots of it and use it to seed the RNG
 	while (c < t)
@@ -1397,6 +1418,8 @@ void UCAN_UCANHandler::SendValue_f32(int16_t Value, float f32)
 	msg.Address = CAN_ID;
 	msg.Channel = 1;
 	msg.Data[0] = UCAN_ChanType_1_f32;
+
+	// Michael's note: *((float*)&msg.Data[3]) = f32; ?
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
 	msg.Data[3] = BytesFromf32(f32, 0);
@@ -1640,6 +1663,10 @@ UCANMessage UCAN_EmptyMessage(void)
 	
 	ReturnMSG.Channel = 0;
 	ReturnMSG.Address = 0;
+
+	// Michael's quick note- Am I being stupid, or does this only initialise the
+	// ReturnMSG.Data[0] to zero? As c == 0, the while loop
+	// continues, now c is 1... (condition fails, 1 <= 0 is false)?
 	
 	while (c <= 0)
 	{
@@ -1832,6 +1859,11 @@ int32_t Bytes32Toi32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
 
 uint8_t BytesFromf32(float f, uint8_t ByteNumber)
 {
+	//
+	// return ((uint8_t*)(&f))[ByteNumber % 4];
+	//
+	// Michael's thought
+
 	union
 	{
 		float f32;
@@ -1895,7 +1927,10 @@ uint8_t BytesFroml16(uint16_t i, uint8_t ByteNumber)
 		uint16_t i16;
 		uint8_t b[2];
 	};
-	
+
+	// Michael's thought: can't ByteNumber can be 3? An int is usually 4 bytes, although
+	// since this isn't guaranteed why limit the byte index at all?
+	// (Also, I think this can be refactored similar to BytesFromFloat).
 	if (ByteNumber < 0) ByteNumber = 0;
 	else if (ByteNumber >= 2) ByteNumber = 1;
 	
