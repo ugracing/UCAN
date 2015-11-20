@@ -182,7 +182,7 @@ begin
 		if Length(LineIn) > 0 then
 			begin
 				CmdIn := ParseCommandFromString(LineIn);
-				CmdIn := PadCommand(CmdIn, 5);
+				CmdIn := PadCommand(CmdIn, 10);
 				CmdIn.Data[2] := ResolveDBGCode(CmdIn.Data[2]);
 				if CmdIn.Data[2] = 'UCAN_Debug_Boot' then
 					begin
