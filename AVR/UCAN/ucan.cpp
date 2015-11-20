@@ -1028,7 +1028,7 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 	MCPCANBus.sendMsgBuf(CAN_ID, 0, 8, txBuff);
 };
 
-void DebugMSG(int MSG)
+void DebugMSG(int16_t MSG)
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1036,7 +1036,7 @@ void DebugMSG(int MSG)
 	#endif
 };
 
-void DebugMSG(int MSG, int data)
+void DebugMSG(int16_t MSG, int16_t data)
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1046,7 +1046,7 @@ void DebugMSG(int MSG, int data)
 	#endif
 };
 
-void DebugMSG(int MSG, float data)
+void DebugMSG(int16_t MSG, float data)
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1056,7 +1056,7 @@ void DebugMSG(int MSG, float data)
 	#endif
 };
 
-void DebugMSG(int MSG, int data, int extdata)
+void DebugMSG(int16_t MSG, int16_t data, int16_t extdata)
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1067,22 +1067,61 @@ void DebugMSG(int MSG, int data, int extdata)
 		Serial.println(extdata);
 	#endif
 };
+
+void DebugMSG(int16_t MSG, int16_t data, uint16_t extdata)
+{
+	#ifndef RELEASE
+		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.print(data);
+		Serial.print(" ");
+		Serial.println(extdata);
+	#endif
+};
+
+void DebugMSG(int16_t MSG, int16_t data, int32_t extdata)
+{
+	#ifndef RELEASE
+		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.print(data);
+		Serial.print(" ");
+		Serial.println(extdata);
+	#endif
+};
+
+void DebugMSG(int16_t MSG, int16_t data, uint32_t extdata)
+{
+	#ifndef RELEASE
+		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(MSG);
+		Serial.print(" ");
+		Serial.print(data);
+		Serial.print(" ");
+		Serial.println(extdata);
+	#endif
+};
+
 void DebugMSG(UCANMessage MSG)
 {
 	#ifndef RELEASE
 		uint8_t c = 0;
 		
 		Serial.print(UCAN_Debug_DebugSTRID);
+		Serial.print(" ");
 		Serial.print(MSG.Address);
 		Serial.print(" ");
 		Serial.print(MSG.Channel);
 		while (c < 7)
 		{
 			Serial.print(" ");
-			Serial.println(MSG.Data[c]);
+			Serial.print(MSG.Data[c]);
 			
 			c++;
 		};
+	Serial.println("");
 	#endif
 };
 
@@ -1135,6 +1174,9 @@ void UCAN_UCANHandler::Chan0_Announce(uint8_t flag)
 	MSG.Data[0] = 0; //TypeID 0 is an announce
 	MSG.Data[1] = flag;
 	
+	MSG.Data[5] = BytesFromi16(BootSecret, 0);
+	MSG.Data[6] = BytesFromi16(BootSecret, 1);
+	
 	SendMessage(MSG);
 	
 	DebugMSG(UCAN_Debug_Chan0Announce, flag);
@@ -1157,6 +1199,9 @@ void UCAN_UCANHandler::Chan0_Request(uint8_t flag, int data)
 	MSG.Data[1] = flag;
 	MSG.Data[2] = b[0];
 	MSG.Data[3] = b[1];
+	
+	MSG.Data[5] = BytesFromi16(BootSecret, 0);
+	MSG.Data[6] = BytesFromi16(BootSecret, 1);
 	
 	SendMessage(MSG);
 	
@@ -1202,6 +1247,7 @@ void UCAN_UCANHandler::Initialize(void)
 		c ++;
 	};
 	
+	DebugMSG(UCAN_Debug_Call_Init, 1);
 	MCPCANBus.Initialize(UCAN_MCPCSPin);
 	
 	if (CAN_ID <= 0)
@@ -1210,6 +1256,7 @@ void UCAN_UCANHandler::Initialize(void)
 		Empty();
 		return;
 	};
+	DebugMSG(UCAN_Debug_Call_Init, 10);
 	
 	if (MCPCANBus.begin(CAN_500KBPS) != CAN_OK)
 	{
@@ -1231,10 +1278,31 @@ void UCAN_UCANHandler::Initialize(void)
 	//See implementation note above
 	//RequestCanID(2047);
 	
-	pinMode(UCAN_MCPIntPin, INPUT);
-	attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
-	
+	pinMode(UCAN_MCPIntPin, INPUT);	
 	Initialized = true;
+	
+	if (UCANCallMode == UCAN_CallMode_FullAuto)
+	{
+		//Attach UCANHandler.main() to CAN interrupt
+		//attachInterrupt(0, UCANCallInterrupt_Default, CHANGE); //0 = INT0 = pin 2
+	};
+	
+	if (UCANCallMode == UCAN_CallMode_ContAuto)
+	{
+		//Attach UCANHandler.main() to timer interrupt
+	};
+	
+	if (UCANCallMode == UCAN_CallMode_FullManual)
+	{
+		//Do not attach UCANHandler.main() to anything, ignore interrupt
+	};
+	
+	if (UCANCallMode == UCAN_CallMode_ContManual)
+	{
+		//UCANHandler.main() attached by user to interrupt
+	};
+	
+	DebugMSG(UCAN_Debug_Call_Init, 100);
 };
 
 void UCAN_UCANHandler::Empty(void)
@@ -1256,26 +1324,6 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 		UCANCallMode = Mode;
 	};
 	
-	if (UCANCallMode == UCAN_CallMode_FullAuto)
-	{
-		//Attach UCANHandler.main() to CAN interrupt
-		//MainCall = UCANCallInterrupt_Default;
-	};
-	
-	if (UCANCallMode == UCAN_CallMode_ContAuto)
-	{
-		//Attach UCANHandler.main() to timer interrupt
-	};
-	
-	if (UCANCallMode == UCAN_CallMode_FullManual)
-	{
-		//Do not attach UCANHandler.main() to anything, ignore interrupt
-	};
-	
-	if (UCANCallMode == UCAN_CallMode_ContManual)
-	{
-		//UCANHandler.main() attached by user to interrupt
-	};
 };
 
 void UCAN_UCANHandler::FeedMode(int Mode)
@@ -1302,7 +1350,45 @@ void UCAN_UCANHandler::WatchValue_f32(int ValueID, float* f32Pointer)
 	TrackingStack.TrackID(ValueID, f32Pointer);
 };
 
-void UCAN_UCANHandler::SendValue_f32(int Value, float f32)
+void UCAN_UCANHandler::SendValue_l32(int16_t Value, uint32_t l32)
+{
+	UCANMessage msg;
+	
+	DebugMSG(UCAN_Debug_SendCall_l32, Value, l32);
+	
+	msg.Address = CAN_ID;
+	msg.Channel = 1;
+	msg.Data[0] = UCAN_ChanType_1_l32;
+	msg.Data[1] = BytesFromi16(Value, 0);
+	msg.Data[2] = BytesFromi16(Value, 1);
+	msg.Data[3] = BytesFroml32(l32, 0);
+	msg.Data[4] = BytesFroml32(l32, 1);
+	msg.Data[5] = BytesFroml32(l32, 2);
+	msg.Data[6] = BytesFroml32(l32, 3);
+	
+	SendMessage(msg);
+};
+
+void UCAN_UCANHandler::SendValue_i32(int16_t Value, int32_t i32)
+{
+	UCANMessage msg;
+	
+	DebugMSG(UCAN_Debug_SendCall_i32, Value, i32);
+	
+	msg.Address = CAN_ID;
+	msg.Channel = 1;
+	msg.Data[0] = UCAN_ChanType_1_i32;
+	msg.Data[1] = BytesFromi16(Value, 0);
+	msg.Data[2] = BytesFromi16(Value, 1);
+	msg.Data[3] = BytesFromi32(i32, 0);
+	msg.Data[4] = BytesFromi32(i32, 1);
+	msg.Data[5] = BytesFromi32(i32, 2);
+	msg.Data[6] = BytesFromi32(i32, 3);
+	
+	SendMessage(msg);
+};
+
+void UCAN_UCANHandler::SendValue_f32(int16_t Value, float f32)
 {
 	UCANMessage msg;
 	
@@ -1311,12 +1397,46 @@ void UCAN_UCANHandler::SendValue_f32(int Value, float f32)
 	msg.Address = CAN_ID;
 	msg.Channel = 1;
 	msg.Data[0] = UCAN_ChanType_1_f32;
-	msg.Data[1] = BytesFromInt(Value, 0);
-	msg.Data[2] = BytesFromInt(Value, 1);
-	msg.Data[3] = BytesFromFloat(f32, 0);
-	msg.Data[4] = BytesFromFloat(f32, 1);
-	msg.Data[5] = BytesFromFloat(f32, 2);
-	msg.Data[6] = BytesFromFloat(f32, 3);
+	msg.Data[1] = BytesFromi16(Value, 0);
+	msg.Data[2] = BytesFromi16(Value, 1);
+	msg.Data[3] = BytesFromf32(f32, 0);
+	msg.Data[4] = BytesFromf32(f32, 1);
+	msg.Data[5] = BytesFromf32(f32, 2);
+	msg.Data[6] = BytesFromf32(f32, 3);
+	
+	SendMessage(msg);
+};
+
+void UCAN_UCANHandler::SendValue_i16(int16_t Value, int16_t i16)
+{
+	UCANMessage msg;
+	
+	DebugMSG(UCAN_Debug_SendCall_i16, Value, i16);
+	
+	msg.Address = CAN_ID;
+	msg.Channel = 1;
+	msg.Data[0] = UCAN_ChanType_1_i16;
+	msg.Data[1] = BytesFromi16(Value, 0);
+	msg.Data[2] = BytesFromi16(Value, 1);
+	msg.Data[3] = BytesFromi16(i16, 0);
+	msg.Data[4] = BytesFromi16(i16, 1);
+	
+	SendMessage(msg);
+};
+
+void UCAN_UCANHandler::SendValue_l16(int16_t Value, uint16_t l16)
+{
+	UCANMessage msg;
+	
+	DebugMSG(UCAN_Debug_SendCall_l16, Value, l16);
+	
+	msg.Address = CAN_ID;
+	msg.Channel = 1;
+	msg.Data[0] = UCAN_ChanType_1_l16;
+	msg.Data[1] = BytesFromi16(Value, 0);
+	msg.Data[2] = BytesFromi16(Value, 1);
+	msg.Data[3] = BytesFroml16(l16, 0);
+	msg.Data[4] = BytesFroml16(l16, 1);
 	
 	SendMessage(msg);
 };
@@ -1351,7 +1471,8 @@ UCANMessage UCAN_UCANHandler::GetNextMessage(void)
 			if (UCANStackMode == UCAN_StackMode_Auto)
 			{
 				MSGStack.InUse[c] = false;
-				MSGStack.StoreMessage(c, UCAN_EmptyMessage());
+				MSGStack.Data[c] = UCAN_EmptyMessage();
+				DebugMSG(UCAN_Debug_Call_GetNext_Clear, c);
 			};
 			
 			return Buffer;
@@ -1374,57 +1495,75 @@ void UCAN_UCANHandler::FetchNewMessages(void)
 	 * 	and read the message from the CAN bus via UCANHAL.
 	*/
 	if (CAN_IsMessagePending() == true)
-	{
-		while (CAN_IsMessagePending() == true)
-		{
-			if (MSGStack.GetAvailableSlots() <= 0)
-			{
-				if (MSGStack.GetAvailableSlots() <= 0)
-				{
-					return;
-				};
-				
-				slot = MSGStack.GetNextEmptySlot();
-				MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
-				MSGStack.InUse[slot] = true;
-				DebugMSG(UCAN_Debug_StoreMSG, slot);
-			};
-			
-			slot = MSGStack.GetNextEmptySlot();
-			MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
-			MSGStack.InUse[c] = true;
-			DebugMSG(UCAN_Debug_StoreMSG, slot);
-		};
+	{		
+		slot = MSGStack.GetNextEmptySlot();
+		MSGStack.StoreMessage(slot, CAN_FetchMsgFromCAN());
+		MSGStack.InUse[c] = true;
+		DebugMSG(UCAN_Debug_StoreMSG, slot);
 	}
 	else {
 		DebugMSG(UCAN_Debug_NoMSG);
+		return;
+	};
+	
+	if (CAN_IsMessagePending() == true && MSGStack.GetAvailableSlots() > 0)
+	{
+		FetchNewMessages();
 	};
 };
 
 void UCAN_UCANHandler::MSGProcessor_DataServ(UCANMessage MSG)
 {
-	float f;
-	int i;
-	int ID;
+	float f32;
+	int16_t i16;
+	uint16_t l16;
+	int16_t ID;
+	uint32_t l32;
+	int32_t i32;
 	
 	DebugMSG(UCAN_Debug_Process_Data, MSG.Data[0]);
 	switch (MSG.Data[0])
 	{
 		case UCAN_ChanType_1_f32:
-				ID = Bytes16ToInt(MSG.Data[1], MSG.Data[2]);
-				f = Bytes32ToFloat(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]);
-				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_f32, ID, f);
+				ID = Bytes16Toi16(MSG.Data[1], MSG.Data[2]);
+				f32 = Bytes32Tof32(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]);
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_f32, ID, f32);
 				
-				TrackingStack.UpdateIDValue(ID, f);
+				TrackingStack.UpdateIDValue(ID, f32);
+			break;
+			
+		case UCAN_ChanType_1_l32:
+				ID = Bytes16Toi16(MSG.Data[1], MSG.Data[2]);
+				l32 = Bytes32Tol32(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]);
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_l32, ID, l32);
+				
+				TrackingStack.UpdateIDValue(ID, l32);
+			break;
+			
+		case UCAN_ChanType_1_i32:
+				ID = Bytes16Toi16(MSG.Data[1], MSG.Data[2]);
+				i32 = Bytes32Toi32(MSG.Data[3], MSG.Data[4], MSG.Data[5], MSG.Data[6]);
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_i32, ID, i32);
+				
+				TrackingStack.UpdateIDValue(ID, i32);
+			break;
+		
+		case UCAN_ChanType_1_l16:
+				ID = Bytes16Toi16(MSG.Data[1], MSG.Data[2]);
+				i16 = Bytes16Tol16(MSG.Data[3], MSG.Data[4]);
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_l16, ID, l16);
+				
+				TrackingStack.UpdateIDValue(ID, l16);
 			break;
 			
 		case UCAN_ChanType_1_i16:
-				ID = Bytes16ToInt(MSG.Data[1], MSG.Data[2]);
-				f = Bytes16ToInt(MSG.Data[3], MSG.Data[4]);
-				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_i16, ID, f);
+				ID = Bytes16Toi16(MSG.Data[1], MSG.Data[2]);
+				i16 = Bytes16Toi16(MSG.Data[3], MSG.Data[4]);
+				DebugMSG(UCAN_Debug_RECV_Ch1_DServ_i16, ID, i16);
 				
-				TrackingStack.UpdateIDValue(ID, f);
+				TrackingStack.UpdateIDValue(ID, i16);
 			break;
+			
 		DebugMSG(UCAN_Debug_BadPKTFormat);
 	};
 };
@@ -1434,6 +1573,12 @@ void UCAN_UCANHandler::MSGProcessor_InfoServ(UCANMessage MSG)
 	switch (MSG.Data[0])
 	{
 		case 0:
+			break;
+		case 1: //catch new devices joining the bus
+				if (Bytes16Toi16(MSG.Data[5], MSG.Data[6]) != BootSecret) //check it is not our own announce
+				{
+					Chan0_Request(2, MSG.Address); //Send halt request to origin of packet
+				};
 			break;
 	};
 };
@@ -1464,6 +1609,8 @@ void UCAN_UCANHandler::ProcessMSGTriggers(void)
 			MSGDispatcher(MSGStack.FetchMessage(c));
 			MSGStack.Data[c] = UCAN_EmptyMessage();
 			MSGStack.InUse[c] = false;
+			
+			DebugMSG(UCAN_Debug_StackCallM_DEL, c);
 		};
 		
 		c ++;
@@ -1472,9 +1619,17 @@ void UCAN_UCANHandler::ProcessMSGTriggers(void)
 
 void UCAN_UCANHandler::Main(void)
 {
+	if (Initialized == false)
+	{
+		return;
+	};
+	
 	DebugMSG(UCAN_Debug_Call_Main);
 	FetchNewMessages();
-	ProcessMSGTriggers();
+	if (UCANFeedMode != UCAN_FeedMode_Manual)
+	{
+		ProcessMSGTriggers();
+	};
 	//ProcessUCANOperations(); //Not yet implemented
 };
 
@@ -1627,7 +1782,7 @@ void UCAN_UCANWatchStack::UpdateIDValue(int ID, float Value)
 	};
 };
 
-float Bytes32ToFloat(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
+float Bytes32Tof32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
 {
 	union
 	{
@@ -1643,7 +1798,39 @@ float Bytes32ToFloat(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
 	return f32;
 };
 
-uint8_t BytesFromFloat(float f, uint8_t ByteNumber)
+uint32_t Bytes32Tol32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
+{
+	union
+	{
+		uint32_t l32;
+		uint8_t b[4];
+	};
+	
+	b[0] = b32_1;
+	b[1] = b32_2;
+	b[2] = b32_3;
+	b[3] = b32_4;
+	
+	return l32;
+};
+
+int32_t Bytes32Toi32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
+{
+	union
+	{
+		int32_t i32;
+		uint8_t b[4];
+	};
+	
+	b[0] = b32_1;
+	b[1] = b32_2;
+	b[2] = b32_3;
+	b[3] = b32_4;
+	
+	return i32;
+};
+
+uint8_t BytesFromf32(float f, uint8_t ByteNumber)
 {
 	union
 	{
@@ -1658,11 +1845,25 @@ uint8_t BytesFromFloat(float f, uint8_t ByteNumber)
 	return b[ByteNumber];
 };
 
-int Bytes16ToInt(uint8_t b16_1, uint8_t b16_2)
+uint16_t Bytes16Tol16(uint8_t b16_1, uint8_t b16_2)
 {
 	union
 	{
-		int i16;
+		uint16_t l16;
+		uint8_t b[2];
+	};
+	
+	b[0] = b16_1;
+	b[1] = b16_2;
+	
+	return l16;
+};
+
+int16_t Bytes16Toi16(uint8_t b16_1, uint8_t b16_2)
+{
+	union
+	{
+		int16_t i16;
 		uint8_t b[2];
 	};
 	
@@ -1672,18 +1873,64 @@ int Bytes16ToInt(uint8_t b16_1, uint8_t b16_2)
 	return i16;
 };
 
-uint8_t BytesFromInt(int i, uint8_t ByteNumber)
+uint8_t BytesFromi16(int16_t i, uint8_t ByteNumber)
 {
 	union
 	{
-		int i16;
+		int16_t i16;
 		uint8_t b[2];
 	};
 	
 	if (ByteNumber < 0) ByteNumber = 0;
-	else if (ByteNumber > 2) ByteNumber = 2;
+	else if (ByteNumber >= 2) ByteNumber = 1;
 	
 	i16 = i;
+	return b[ByteNumber];
+};
+
+uint8_t BytesFroml16(uint16_t i, uint8_t ByteNumber)
+{
+	union
+	{
+		uint16_t i16;
+		uint8_t b[2];
+	};
+	
+	if (ByteNumber < 0) ByteNumber = 0;
+	else if (ByteNumber >= 2) ByteNumber = 1;
+	
+	i16 = i;
+	return b[ByteNumber];
+};
+
+uint8_t BytesFromi32(int32_t i, uint8_t ByteNumber)
+{
+	union
+	{
+		int32_t i32;
+		uint8_t b[4];
+	};
+	
+	if (ByteNumber < 0) ByteNumber = 0;
+	else if (ByteNumber >= 4) ByteNumber = 3;
+	
+	i32 = i;
+	return b[ByteNumber];
+};
+
+
+uint8_t BytesFroml32(uint32_t i, uint8_t ByteNumber)
+{
+	union
+	{
+		uint32_t l32;
+		uint8_t b[4];
+	};
+	
+	if (ByteNumber < 0) ByteNumber = 0;
+	else if (ByteNumber >= 4) ByteNumber = 3;
+	
+	l32 = i;
 	return b[ByteNumber];
 };
 

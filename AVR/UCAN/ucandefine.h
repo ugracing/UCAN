@@ -10,7 +10,7 @@
 //   AVR-LOWMem specific stuff. Tweak this at your own risk of breaking UCAN.
 
 //4 messages in queue should be enough for everyone at 8 bytes a pop on a 2K system.
-#define UCAN_MSGStack_Size				4
+#define UCAN_MSGStack_Size				8
 
 //Allow tracking of 16 different parameters (4 bytes each)
 #define UCAN_FeedStack_Size				8

@@ -17,9 +17,9 @@
  * 	information, please see https://github.com/coryjfowler/MCP_CAN_lib
  * 
  * UCAN Information:
- * 	Standard			:			0A0
+ * 	Standard			:			0A1
  * 	Development name	:			UCAN-AVR/Kryolith
- * 	Revision			:			0
+ * 	Revision			:			1
  * 
  * This code is not currently placed under any license and therefore
  * 	not for public release. It is intended for internal use by UGRacing
@@ -27,7 +27,8 @@
  * 	use.
 */
 
-
+	//#define RELEASE
+	
 	#include "Arduino.h"
 	#include <SPI.h>
 	#include <inttypes.h>
@@ -152,6 +153,7 @@
 	};
 
 	UCANMessage UCAN_EmptyMessage(void);
+	
 	void DebugMSG(int MSG);
 	void DebugMSG(int MSG, int data);
 	void DebugMSG(UCANMessage MSG);
@@ -209,7 +211,14 @@
 			void Initialize(void);
 			void Empty(void);
 			void WatchValue_f32(int Value, float* f32Pointer);
-			void SendValue_f32(int Value, float f32);
+			
+			void SendValue_i16(int16_t Value, int16_t i16);
+			void SendValue_l16(int16_t Value, uint16_t l16);
+			
+			void SendValue_i32(int16_t Value, int32_t i32);
+			void SendValue_l32(int16_t Value, uint32_t l32);
+			void SendValue_f32(int16_t Value, float f32);
+			
 			void Main(void);
 			bool IsMessagePending(void);
 			UCANMessage GetNextMessage(void);
@@ -218,11 +227,20 @@
 			uint8_t NewStreamDUID(void);
 	};
 	
-	float Bytes32ToFloat(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4);
-	uint8_t BytesFromFloat(float f, uint8_t ByteNumber);
+	int16_t Bytes16Toi16(uint8_t b16_1, uint8_t b16_2);
+	uint8_t BytesFromi16(int16_t i, uint8_t ByteNumber);	
 	
-	int Bytes16ToInt(uint8_t b16_1, uint8_t b16_2);
-	uint8_t BytesFromInt(int i, uint8_t ByteNumber);
+	uint16_t Bytes16Tol16(uint8_t b16_1, uint8_t b16_2);
+	uint8_t BytesFroml16(uint16_t i, uint8_t ByteNumber);	
+	
+	int32_t Bytes32Toi32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4);
+	uint8_t BytesFromi32(int32_t i, uint8_t ByteNumber);
+
+	uint32_t Bytes32Tol32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4);
+	uint8_t BytesFroml32(uint32_t i, uint8_t ByteNumber);	
+
+	float Bytes32Tof32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4);
+	uint8_t BytesFromf32(float f, uint8_t ByteNumber);
 	
 	void UCANCallInterrupt_Default();
 	
