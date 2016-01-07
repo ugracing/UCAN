@@ -2,9 +2,6 @@
 	#include <ucan.h>
 #endif
 
-// Michael's note: move guards to header file
-// Michael's note: remove semicolons after if statements, style?
-
 //MCP Interface code from MCP_CAN
 #define spi_readwrite SPI.transfer
 #define spi_read() spi_readwrite(0x00)
@@ -148,7 +145,6 @@ INT8U MCP_CAN::mcp2515_configRate(const INT8U canSpeed)
     set = 1;
     switch (canSpeed) 
     {
-		// Michael's note: lookup table?
         case (CAN_5KBPS):
         cfg1 = MCP_16MHz_5kBPS_CFG1;
         cfg2 = MCP_16MHz_5kBPS_CFG2;
@@ -901,13 +897,7 @@ int UCAN_UCANFeedStack::FindIDPosition(int id)
 
 void UCAN_UCANFeedStack::Initialize(void)
 {
-	// Michael's note: memset
-	int c = 0;
-	while (c <= UCAN_FeedStack_Size)
-	{
-		TrackingID[c] = -1;
-		c ++;
-	};
+	memset(&TrackingID, -1, UCAN_FeedStack_Size);
 };
 
 void UCAN_UCANFeedStack::Empty(void)
@@ -1042,8 +1032,10 @@ void DebugMSG(int16_t MSG)
 //		#define DEBUG_MSG(msg, data, extdata) DebugMSG(...)
 // #endif
 //
+// Responose: GCC optimization should remove these empty calls anyway... Style consideration?
 
 // Michael's note: use C++ templates to combine these functions into one?
+// Response: Possible. Templates untested in current build environment. Left as exercise to reader.
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1252,6 +1244,9 @@ void UCAN_UCANHandler::Initialize(void)
 	// and try and change the loop into a maths function to ensure an even distribution.
 	// Is there a more foolproof way to solve the "force shutdown" problem of CAN nodes by ID, where
 	// the node shuts down itself?
+	
+	//Response: Current mechanism appears to work. Not a priority for current stages of development.
+	//			Better implementation welcome if offered and tested. This could reduce boot times considerably.
 
 	//We will need a unique secret to this device for identification
 	randomSeed(analogRead(A6));
@@ -1302,6 +1297,7 @@ void UCAN_UCANHandler::Initialize(void)
 	pinMode(UCAN_MCPIntPin, INPUT);	
 	Initialized = true;
 	
+	//NOTE: Interrupt based UCAN scheduled to be re-enabled for February 2016.
 	if (UCANCallMode == UCAN_CallMode_FullAuto)
 	{
 		//Attach UCANHandler.main() to CAN interrupt
@@ -1344,7 +1340,6 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 	{
 		UCANCallMode = Mode;
 	};
-	
 };
 
 void UCAN_UCANHandler::FeedMode(int Mode)
@@ -1382,10 +1377,9 @@ void UCAN_UCANHandler::SendValue_l32(int16_t Value, uint32_t l32)
 	msg.Data[0] = UCAN_ChanType_1_l32;
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
-	msg.Data[3] = BytesFroml32(l32, 0);
-	msg.Data[4] = BytesFroml32(l32, 1);
-	msg.Data[5] = BytesFroml32(l32, 2);
-	msg.Data[6] = BytesFroml32(l32, 3);
+	for (uint8_t i = 0; i < 4; i ++) {
+		msg.Data[i + 3] = BytesFroml32(l32, i);
+	};
 	
 	SendMessage(msg);
 };
@@ -1401,10 +1395,9 @@ void UCAN_UCANHandler::SendValue_i32(int16_t Value, int32_t i32)
 	msg.Data[0] = UCAN_ChanType_1_i32;
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
-	msg.Data[3] = BytesFromi32(i32, 0);
-	msg.Data[4] = BytesFromi32(i32, 1);
-	msg.Data[5] = BytesFromi32(i32, 2);
-	msg.Data[6] = BytesFromi32(i32, 3);
+	for (uint8_t i = 0; i < 4; i ++) {
+		msg.Data[i + 3] = BytesFroml32(l32, i);
+	};
 	
 	SendMessage(msg);
 };
@@ -1420,12 +1413,12 @@ void UCAN_UCANHandler::SendValue_f32(int16_t Value, float f32)
 	msg.Data[0] = UCAN_ChanType_1_f32;
 
 	// Michael's note: *((float*)&msg.Data[3]) = f32; ?
+	// Response: Compromise for readbility is new for loop.
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
-	msg.Data[3] = BytesFromf32(f32, 0);
-	msg.Data[4] = BytesFromf32(f32, 1);
-	msg.Data[5] = BytesFromf32(f32, 2);
-	msg.Data[6] = BytesFromf32(f32, 3);
+	for (uint8_t i = 0; i < 4; i ++) {
+		msg.Data[i + 3] = BytesFroml32(l32, i);
+	};
 	
 	SendMessage(msg);
 };
@@ -1658,7 +1651,6 @@ void UCAN_UCANHandler::Main(void)
 
 UCANMessage UCAN_EmptyMessage(void)
 {
-	uint8_t c = 0;
 	UCANMessage ReturnMSG;
 	
 	ReturnMSG.Channel = 0;
@@ -1668,10 +1660,10 @@ UCANMessage UCAN_EmptyMessage(void)
 	// ReturnMSG.Data[0] to zero? As c == 0, the while loop
 	// continues, now c is 1... (condition fails, 1 <= 0 is false)?
 	
-	while (c <= 0)
-	{
-		ReturnMSG.Data[c] = 0;
-		c ++;
+	// Response: Good catch. Idiot programmer made doodoo. Now fixed with for loop style!
+	
+	for (uint8_t i = 0; i <= 7; i ++) {
+		ReturnMSG.Data[i] = 0;
 	};
 	
 	return ReturnMSG;
@@ -1859,22 +1851,7 @@ int32_t Bytes32Toi32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
 
 uint8_t BytesFromf32(float f, uint8_t ByteNumber)
 {
-	//
-	// return ((uint8_t*)(&f))[ByteNumber % 4];
-	//
-	// Michael's thought
-
-	union
-	{
-		float f32;
-		uint8_t b[4];
-	};
-	
-	if (ByteNumber < 0) ByteNumber = 0;
-	else if (ByteNumber > 3) ByteNumber = 3;
-	
-	f32 = f;
-	return b[ByteNumber];
+	return ((uint8_t*)(&f))[ByteNumber % 4];
 };
 
 uint16_t Bytes16Tol16(uint8_t b16_1, uint8_t b16_2)
@@ -1928,9 +1905,6 @@ uint8_t BytesFroml16(uint16_t i, uint8_t ByteNumber)
 		uint8_t b[2];
 	};
 
-	// Michael's thought: can't ByteNumber can be 3? An int is usually 4 bytes, although
-	// since this isn't guaranteed why limit the byte index at all?
-	// (Also, I think this can be refactored similar to BytesFromFloat).
 	if (ByteNumber < 0) ByteNumber = 0;
 	else if (ByteNumber >= 2) ByteNumber = 1;
 	
