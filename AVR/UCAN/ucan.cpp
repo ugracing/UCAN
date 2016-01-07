@@ -1662,7 +1662,7 @@ UCANMessage UCAN_EmptyMessage(void)
 	
 	// Response: Good catch. Idiot programmer made doodoo. Now fixed with for loop style!
 	
-	for (uint8_t i = 0; i <= 7; i ++) {
+	for (uint8_t i = 0; i <= 6; i ++) {
 		ReturnMSG.Data[i] = 0;
 	};
 	
