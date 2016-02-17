@@ -1023,7 +1023,6 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 	MCPCANBus.sendMsgBuf(CAN_ID, 0, 8, txBuff);
 };
 
-void DebugMSG(int16_t MSG)
 // Michael's note: could we make DebugMSG a macro like so:
 //
 // #ifdef RELEASE
@@ -1036,6 +1035,8 @@ void DebugMSG(int16_t MSG)
 
 // Michael's note: use C++ templates to combine these functions into one?
 // Response: Possible. Templates untested in current build environment. Left as exercise to reader.
+
+void DebugMSG(int16_t MSG)
 {
 	#ifndef RELEASE
 		Serial.print(UCAN_Debug_DebugSTRID);
@@ -1240,6 +1241,10 @@ void UCAN_UCANHandler::Initialize(void)
 	delay(100);
 	digitalWrite(UCAN_MCPResetPin, HIGH);
 	
+	//We will need a unique secret to this device for identification
+	randomSeed(analogRead(A6));
+	t = random(1000);
+	
 	// Michael's note: check distribution of analogRead calls (returns integers 1-1023)
 	// and try and change the loop into a maths function to ensure an even distribution.
 	// Is there a more foolproof way to solve the "force shutdown" problem of CAN nodes by ID, where
@@ -1247,11 +1252,7 @@ void UCAN_UCANHandler::Initialize(void)
 	
 	//Response: Current mechanism appears to work. Not a priority for current stages of development.
 	//			Better implementation welcome if offered and tested. This could reduce boot times considerably.
-
-	//We will need a unique secret to this device for identification
-	randomSeed(analogRead(A6));
-	t = random(1000);
-
+	
 	//We should pick up some electrical noise...
 	//So we will get lots of it and use it to seed the RNG
 	while (c < t)
@@ -1298,6 +1299,7 @@ void UCAN_UCANHandler::Initialize(void)
 	Initialized = true;
 	
 	//NOTE: Interrupt based UCAN scheduled to be re-enabled for February 2016.
+
 	if (UCANCallMode == UCAN_CallMode_FullAuto)
 	{
 		//Attach UCANHandler.main() to CAN interrupt
@@ -1340,6 +1342,7 @@ void UCAN_UCANHandler::HandlerMode(int Mode)
 	{
 		UCANCallMode = Mode;
 	};
+	
 };
 
 void UCAN_UCANHandler::FeedMode(int Mode)
@@ -1377,6 +1380,7 @@ void UCAN_UCANHandler::SendValue_l32(int16_t Value, uint32_t l32)
 	msg.Data[0] = UCAN_ChanType_1_l32;
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
+
 	for (uint8_t i = 0; i < 4; i ++) {
 		msg.Data[i + 3] = BytesFroml32(l32, i);
 	};
@@ -1395,10 +1399,11 @@ void UCAN_UCANHandler::SendValue_i32(int16_t Value, int32_t i32)
 	msg.Data[0] = UCAN_ChanType_1_i32;
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
-	for (uint8_t i = 0; i < 4; i ++) {
-		msg.Data[i + 3] = BytesFroml32(l32, i);
-	};
 	
+	for (uint8_t i = 0; i < 4; i ++) {
+		msg.Data[i + 3] = BytesFromi32(i32, i);
+	};
+
 	SendMessage(msg);
 };
 
@@ -1411,14 +1416,13 @@ void UCAN_UCANHandler::SendValue_f32(int16_t Value, float f32)
 	msg.Address = CAN_ID;
 	msg.Channel = 1;
 	msg.Data[0] = UCAN_ChanType_1_f32;
-
-	// Michael's note: *((float*)&msg.Data[3]) = f32; ?
-	// Response: Compromise for readbility is new for loop.
 	msg.Data[1] = BytesFromi16(Value, 0);
 	msg.Data[2] = BytesFromi16(Value, 1);
+	
 	for (uint8_t i = 0; i < 4; i ++) {
-		msg.Data[i + 3] = BytesFroml32(l32, i);
+		msg.Data[i + 3] = BytesFromf32(f32, i);
 	};
+
 	
 	SendMessage(msg);
 };
@@ -1651,11 +1655,12 @@ void UCAN_UCANHandler::Main(void)
 
 UCANMessage UCAN_EmptyMessage(void)
 {
+	uint8_t c = 0;
 	UCANMessage ReturnMSG;
 	
 	ReturnMSG.Channel = 0;
 	ReturnMSG.Address = 0;
-
+	
 	// Michael's quick note- Am I being stupid, or does this only initialise the
 	// ReturnMSG.Data[0] to zero? As c == 0, the while loop
 	// continues, now c is 1... (condition fails, 1 <= 0 is false)?
@@ -1851,7 +1856,17 @@ int32_t Bytes32Toi32(uint8_t b32_1, uint8_t b32_2, uint8_t b32_3, uint8_t b32_4)
 
 uint8_t BytesFromf32(float f, uint8_t ByteNumber)
 {
-	return ((uint8_t*)(&f))[ByteNumber % 4];
+	union
+	{
+		float f32;
+		uint8_t b[4];
+	};
+	
+	if (ByteNumber < 0) ByteNumber = 0;
+	else if (ByteNumber > 3) ByteNumber = 3;
+	
+	f32 = f;
+	return b[ByteNumber];
 };
 
 uint16_t Bytes16Tol16(uint8_t b16_1, uint8_t b16_2)
@@ -1904,7 +1919,7 @@ uint8_t BytesFroml16(uint16_t i, uint8_t ByteNumber)
 		uint16_t i16;
 		uint8_t b[2];
 	};
-
+	
 	if (ByteNumber < 0) ByteNumber = 0;
 	else if (ByteNumber >= 2) ByteNumber = 1;
 	

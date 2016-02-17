@@ -1,7 +1,8 @@
 #define UCAN_h
 
 //#define UCAN_MCPCSPin					10 //NOT FINAL
-#define UCAN_MCPCSPin					9 //For post-jim hw
+//#define UCAN_MCPCSPin					9 //For post-jim hw
+#define UCAN_MCPCSPin					5 //For N5110 compatibility with port based libs
 
 //WARNING: Changing the INT pin means changing the UCAN interrupt. See ucan.cpp
 #define UCAN_MCPIntPin					2 //pin connected to MCP2515 INT [Low when data ready by default]
@@ -62,6 +63,8 @@
 #define UCAN_ChanType_1_bin4			53
 #define UCAN_ChanType_1_bin5			54
 #define UCAN_ChanType_1_bin6			55
+
+#define UCAN_ChanType_1_binblk			100
 
 //Define the packet types for channel 2 stream data - DO NOT MODIFY
 #define UCAN_ChanType_2_DUIDQRY			1
