@@ -1,3 +1,19 @@
+/*
+ * UCAN Channel 1 Data Tansmission
+ * 
+ * Implements a basic node on the UCAN network to send paramter values
+ * over the UCAN bus.
+ * 
+ * This code is provided as is for use as a reference use case for the
+ * afformentioned feature. In the case of provisional features, proofs 
+ * of concept and technology demonstrators, changes may be made to the
+ * function and/or inclusion of the features. Reference code is not a 
+ * complete documentation for UCAN - please consult the UCAN Technical
+ * Reference Manual available on the forum, or in the GUES room.
+ * 
+ *  Author: Benjamin Gregg-Smith (bgreggsmith@live.co.uk)
+*/
+
 #include <SPI.h>
 #include <ucan.h>
 
@@ -9,7 +25,7 @@ void setup()
 	
 	DebugMSG(UCAN_Debug_Boot); //Let any debug code know we just booted up
 	
-	UCAN.SetID(602); //We want to be known as device 601
+	UCAN.SetID(602); //We want to be known as device 602
 	
     //These are basically the defaults, though it is always a good idea
     // to set the manually so it is clear what behaviour we expect

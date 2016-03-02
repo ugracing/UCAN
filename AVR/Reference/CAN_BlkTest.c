@@ -1,8 +1,8 @@
 /*
- * UCAN Channel 1 Automated Data Client
+ * UCAN Channel 1 Block Transmission Support POC/Tech Demo (Provisional)
  * 
- * Implements a basic client node for a UCAN network with the aim of
- * monitoring some parameters on the bus.
+ * Implements provisional support for Channel 1 block transmission.
+ * Proof of concept/technology demonstrator code.
  * 
  * This code is provided as is for use as a reference use case for the
  * afformentioned feature. In the case of provisional features, proofs 
@@ -17,11 +17,8 @@
 #include <SPI.h>
 #include <ucan.h>
 
-float SomeImportantValuei32;
-float SomeImportantValuel32;
-float SomeImportantValuef32;
-float SomeImportantValuei16;
-float SomeImportantValuel16;
+float SomeImportantValue;
+uint8_t BlkData[20];
 
 void setup()
 {
@@ -29,7 +26,7 @@ void setup()
 	
 	DebugMSG(UCAN_Debug_Boot); //Let any debug code know we just booted up
 	
-	UCAN.SetID(601); //We want to be known as device 601
+	UCAN.SetID(602); //We want to be known as device 601
 	
     //These are basically the defaults, though it is always a good idea
     // to set the manually so it is clear what behaviour we expect
@@ -40,33 +37,20 @@ void setup()
     //Lets get everythin working (makes UCAN live)
     UCAN.Initialize();
     
-    //We want to track parameter 123. Have UCAN dump the value in our variable automatically
-    UCAN.WatchValue_f32(321, &SomeImportantValuei32);
-    UCAN.WatchValue_f32(322, &SomeImportantValuel32);
-    UCAN.WatchValue_f32(323, &SomeImportantValuef32);
-    UCAN.WatchValue_f32(161, &SomeImportantValuei16);
-    UCAN.WatchValue_f32(162, &SomeImportantValuel16);
+    uint8_t c = 0;
+    while (c < 20)
+    {
+		BlkData[c] = c + 1;
+		c ++;
+	};
 };
-
-uint32_t LastCall = millis();
 
 void loop()
 {
 	//An example main loop.
-    int SomeThreshold = 100;
+    int SomeInt = 0;
     
-    while (true)
-    {
-		UCAN.Main();
-		
-		if (millis() - LastCall > 500)
-		{
-			LastCall = millis();
-			DebugMSG(UCAN_Debug_UserDebug_1, SomeImportantValuei32);
-			DebugMSG(UCAN_Debug_UserDebug_2, SomeImportantValuel32);
-			DebugMSG(UCAN_Debug_UserDebug_3, SomeImportantValuef32);
-			DebugMSG(UCAN_Debug_UserDebug_4, SomeImportantValuei16);
-			DebugMSG(UCAN_Debug_UserDebug_5, SomeImportantValuel16);
-	};
-    };
+    UCAN.SendBlock(44, 20, BlkData);
+    
+    delay(250);
 };

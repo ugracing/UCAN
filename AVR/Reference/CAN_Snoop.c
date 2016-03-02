@@ -1,3 +1,20 @@
+/*
+ * UCAN Network wide snoop & manual packet handling
+ * 
+ * Implements an 'out-of spec' (for most users) node on the UCAN network
+ * to grab all traffic from the bus and bridges the output to a UART
+ * serial for debugging.
+ * 
+ * This code is provided as is for use as a reference use case for the
+ * afformentioned feature. In the case of provisional features, proofs 
+ * of concept and technology demonstrators, changes may be made to the
+ * function and/or inclusion of the features. Reference code is not a 
+ * complete documentation for UCAN - please consult the UCAN Technical
+ * Reference Manual available on the forum, or in the GUES room.
+ * 
+ *  Author: Benjamin Gregg-Smith (bgreggsmith@live.co.uk)
+*/
+
 #include <SPI.h>
 #include <ucan.h>
 
