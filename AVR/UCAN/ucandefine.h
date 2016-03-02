@@ -64,6 +64,8 @@
 #define UCAN_ChanType_1_bin5			54
 #define UCAN_ChanType_1_bin6			55
 
+#define UCAN_ChanType_1_blk				60
+
 #define UCAN_ChanType_1_binblk			100
 
 //Define the packet types for channel 2 stream data - DO NOT MODIFY

@@ -980,6 +980,58 @@ bool UCAN_UCANHandler::CAN_IsMessagePending(void)
 	};
 };
 
+void UCAN_UCANHandler::SendBlock(int16_t Value, int16_t BlockSize, uint8_t* Data)
+{
+	//For R1 we won't worry about dropped packets and just send the stream once
+	//For R2 we could use a TX buffer and flush them upon ACK receipt
+	uint8_t SendPos = 0;
+	uint8_t* MemPos = Data;
+	uint8_t CKSum;
+	uint8_t i;
+	
+	UCANMessage BuffMSG;
+	
+	BuffMSG.Address = CAN_ID;
+	BuffMSG.Channel = 1;
+	
+	BuffMSG.Data[0] = UCAN_ChanType_1_blk;
+	
+	BuffMSG.Data[1] = BytesFromi16(Value, 0);
+	BuffMSG.Data[2] = BytesFromi16(Value, 1);
+	
+	BuffMSG.Data[3] = BytesFromi16(BlockSize, 0);
+	BuffMSG.Data[4] = BytesFromi16(BlockSize, 1);
+	
+	BuffMSG.Data[6] = 0;
+	
+	SendMessage(BuffMSG);
+	
+	while (SendPos < BlockSize)
+	{
+		CKSum = 0;
+		
+		BuffMSG.Address = CAN_ID;
+		BuffMSG.Channel = 1;
+		BuffMSG.Data[0] = UCAN_ChanType_1_blk;
+		BuffMSG.Data[1] = BytesFroml16(Value, 0);
+		BuffMSG.Data[2] = BytesFroml16(Value, 1);
+		BuffMSG.Data[3] = SendPos;
+		
+		i = 4;
+		while (i <= 6) {
+			BuffMSG.Data[i] = *MemPos;
+			MemPos ++;
+			SendPos ++;
+			i ++;
+			
+			if (SendPos > BlockSize) {
+				break;
+			};
+		};
+		SendMessage(BuffMSG);
+	};
+};
+
 UCANMessage UCAN_UCANHandler::CAN_FetchMsgFromCAN(void)
 {
 	uint8_t c = 0;
@@ -1010,13 +1062,13 @@ UCANMessage UCAN_UCANHandler::CAN_FetchMsgFromCAN(void)
 
 void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 {
-	uint8_t c = 0;
+	uint8_t c = 1;
 	uint8_t txBuff[8];
 	
 	txBuff[0] = MSG.Channel;
-	while (c <= 6)
+	while (c < 8)
 	{
-		txBuff[c + 1] = MSG.Data[c];
+		txBuff[c] = MSG.Data[c - 1];
 		c ++;
 	};
 	
@@ -1034,7 +1086,7 @@ void UCAN_UCANHandler::CAN_SendMSG(UCANMessage MSG)
 // Responose: GCC optimization should remove these empty calls anyway... Style consideration?
 
 // Michael's note: use C++ templates to combine these functions into one?
-// Response: Possible. Templates untested in current build environment. Left as exercise to reader.
+// Response: Possible. Templates untested in current build environment. Left as exercise to
 
 void DebugMSG(int16_t MSG)
 {
@@ -1126,10 +1178,10 @@ void DebugMSG(UCANMessage MSG)
 		{
 			Serial.print(" ");
 			Serial.print(MSG.Data[c]);
-			
+
 			c++;
 		};
-	Serial.println("");
+		Serial.println("");
 	#endif
 };
 
@@ -1171,6 +1223,7 @@ void UCAN_UCANHandler::IntProc_RXHandler(void)
 void UCAN_UCANHandler::SendMessage(UCANMessage msg)
 {
 	DebugMSG(UCAN_Debug_TxMSG);
+	DebugMSG(msg);
 	CAN_SendMSG(msg);
 };
 
@@ -1379,11 +1432,11 @@ void UCAN_UCANHandler::SendValue_l32(int16_t Value, uint32_t l32)
 	msg.Channel = 1;
 	msg.Data[0] = UCAN_ChanType_1_l32;
 	msg.Data[1] = BytesFromi16(Value, 0);
-	msg.Data[2] = BytesFromi16(Value, 1);
 
 	for (uint8_t i = 0; i < 4; i ++) {
 		msg.Data[i + 3] = BytesFroml32(l32, i);
 	};
+
 	
 	SendMessage(msg);
 };
@@ -1404,6 +1457,7 @@ void UCAN_UCANHandler::SendValue_i32(int16_t Value, int32_t i32)
 		msg.Data[i + 3] = BytesFromi32(i32, i);
 	};
 
+	
 	SendMessage(msg);
 };
 
@@ -1661,7 +1715,7 @@ UCANMessage UCAN_EmptyMessage(void)
 	ReturnMSG.Channel = 0;
 	ReturnMSG.Address = 0;
 	
-	// Michael's quick note- Am I being stupid, or does this only initialise the
+		// Michael's quick note- Am I being stupid, or does this only initialise the
 	// ReturnMSG.Data[0] to zero? As c == 0, the while loop
 	// continues, now c is 1... (condition fails, 1 <= 0 is false)?
 	

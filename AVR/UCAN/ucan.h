@@ -219,6 +219,8 @@
 			void SendValue_l32(int16_t Value, uint32_t l32);
 			void SendValue_f32(int16_t Value, float f32);
 			
+			void SendBlock(int16_t Value, int16_t Size, uint8_t* Data); //Provisional
+			
 			void Main(void);
 			bool IsMessagePending(void);
 			UCANMessage GetNextMessage(void);
